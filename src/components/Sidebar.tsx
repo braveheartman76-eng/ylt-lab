@@ -20,10 +20,10 @@ const menu = [
     href: '/resources',
     adminOnly: false,
     items: [
-      { label: '형법',     href: '/resources' },
-      { label: '형사소송법', href: '/resources' },
-      { label: '교정학',   href: '/resources' },
-      { label: '노동법',   href: '/resources' },
+      { label: '형법',     href: '/resources/criminal-law' },
+      { label: '형사소송법', href: '/resources/procedure' },
+      { label: '교정학',   href: '/resources/corrections' },
+      { label: '노동법',   href: '/resources/labor' },
     ],
   },
   {
@@ -41,7 +41,7 @@ const menu = [
     href: '/admin',
     adminOnly: false,
     items: [
-      { label: '자료 관리', href: '/resources' },
+      { label: '자료 관리', href: '/admin/resources' },
       { label: '검수 관리', href: '/admin/proofreading' },
       { label: '회원 관리', href: '/admin/users' },
       { label: '설정', href: '/admin/settings' },

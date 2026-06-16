@@ -2,7 +2,7 @@ const adminMenus = [
   {
     title: '자료 관리',
     desc: '자료실 파일 업로드·수정·삭제',
-    href: '/resources',
+    href: '/admin/resources',
     count: '124개',
     icon: '📁',
   },

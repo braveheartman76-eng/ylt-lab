@@ -6,6 +6,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 export type Role = 'admin' | 'student'
 export type MaterialCategory = '형법' | '형사소송법' | '교정학' | '노동법'
+export type FileType = 'open' | 'study'
 export type QuizType = 'MCQ' | 'OX'
 
 // ============================================================
@@ -43,6 +44,7 @@ export type Database = {
           title: string
           file_url: string
           category: MaterialCategory
+          file_type: FileType
           file_size: number | null
           created_at: string
         }
@@ -51,6 +53,7 @@ export type Database = {
           title: string
           file_url: string
           category: MaterialCategory
+          file_type?: FileType
           file_size?: number | null
           created_at?: string
         }
@@ -58,6 +61,7 @@ export type Database = {
           title?: string
           file_url?: string
           category?: MaterialCategory
+          file_type?: FileType
           file_size?: number | null
         }
         Relationships: []
