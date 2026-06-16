@@ -3,6 +3,7 @@ import { Geist } from 'next/font/google'
 import './globals.css'
 import Header from '@/components/Header'
 import Sidebar from '@/components/Sidebar'
+import FloatingButtons from '@/components/FloatingButtons'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
 
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </main>
         </div>
+        <FloatingButtons />
       </body>
     </html>
   )
