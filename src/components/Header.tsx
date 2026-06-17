@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useAuth } from '@/lib/auth-context'
 
 const navItems = [
   { label: '홈', href: '/' },
@@ -12,6 +13,7 @@ const navItems = [
 
 export default function Header() {
   const pathname = usePathname()
+  const { profile, isLoading, signOut } = useAuth()
 
   return (
     <header className="h-16 bg-[#1a2a4a] text-white flex items-center justify-between px-6 shadow-lg z-20 flex-shrink-0">
@@ -25,26 +27,58 @@ export default function Header() {
         </div>
       </Link>
 
-      <nav className="flex items-center gap-1">
-        {navItems.map((item) => {
-          const active = item.href === '/'
-            ? pathname === '/'
-            : pathname.startsWith(item.href)
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`px-4 py-1.5 text-sm rounded transition-colors ${
-                active
-                  ? 'bg-white/20 text-white font-medium'
-                  : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              {item.label}
-            </Link>
-          )
-        })}
-      </nav>
+      <div className="flex items-center gap-1">
+        <nav className="flex items-center gap-1">
+          {navItems.map((item) => {
+            const active = item.href === '/'
+              ? pathname === '/'
+              : pathname.startsWith(item.href)
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`px-4 py-1.5 text-sm rounded transition-colors ${
+                  active
+                    ? 'bg-white/20 text-white font-medium'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                {item.label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="ml-2 pl-3 border-l border-white/20 flex items-center gap-2">
+          {!isLoading && (
+            profile ? (
+              <>
+                <span className="text-sm text-white/80 max-w-[120px] truncate">
+                  {profile.name}
+                  {profile.role === 'admin' && (
+                    <span className="ml-1 text-[10px] bg-[#c9a84c] text-[#1a2a4a] font-bold px-1.5 py-0.5 rounded">
+                      관리자
+                    </span>
+                  )}
+                </span>
+                <button
+                  onClick={signOut}
+                  className="px-3 py-1.5 text-sm text-white/70 hover:text-white hover:bg-white/10 rounded transition-colors"
+                >
+                  로그아웃
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="px-4 py-1.5 text-sm bg-[#c9a84c] text-[#1a2a4a] font-semibold rounded hover:bg-[#b8943e] transition-colors"
+              >
+                로그인
+              </Link>
+            )
+          )}
+        </div>
+      </div>
     </header>
   )
 }

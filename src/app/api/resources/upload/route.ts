@@ -30,9 +30,11 @@ export async function POST(req: NextRequest) {
     if (!ext || !ALLOWED_EXT[ext])                   return NextResponse.json({ error: 'pdf, hwpx, docx 파일만 업로드 가능합니다.' }, { status: 400 })
     if (file.size > MAX_SIZE)                        return NextResponse.json({ error: '파일 크기는 50MB 이하여야 합니다.' },   { status: 400 })
 
-    const buffer   = Buffer.from(await file.arrayBuffer())
-    const safeName = file.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_')
-    const path     = `${Date.now()}_${safeName}`
+    const buffer    = Buffer.from(await file.arrayBuffer())
+    const baseName  = file.name.replace(/\.[^.]+$/, '')
+    const asciiOnly = baseName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 40)
+    const safeBase  = asciiOnly || 'file'
+    const path      = `${Date.now()}_${safeBase}${ext}`
     const bucket   = fileType === 'study' ? 'study-files' : 'open-files'
 
     const { error: storageErr } = await supabaseServer.storage

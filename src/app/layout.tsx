@@ -4,6 +4,7 @@ import './globals.css'
 import Header from '@/components/Header'
 import Sidebar from '@/components/Sidebar'
 import FloatingButtons from '@/components/FloatingButtons'
+import { AuthProvider } from '@/lib/auth-context'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
 
@@ -16,14 +17,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko" className={`${geist.variable} h-full`}>
       <body className="h-full flex flex-col antialiased bg-[#f5f7fa]">
-        <Header />
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto">
-            {children}
-          </main>
-        </div>
-        <FloatingButtons />
+        <AuthProvider>
+          <Header />
+          <div className="flex flex-1 overflow-hidden">
+            <Sidebar />
+            <main className="flex-1 overflow-y-auto">
+              {children}
+            </main>
+          </div>
+          <FloatingButtons />
+        </AuthProvider>
       </body>
     </html>
   )

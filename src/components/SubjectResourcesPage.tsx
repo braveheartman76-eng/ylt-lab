@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import type { Material, MaterialCategory } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 
 interface Props {
   category: MaterialCategory
@@ -37,6 +39,7 @@ export default function SubjectResourcesPage({ category, categoryLabel, descript
   const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
+  const { isAdmin } = useAuth()
 
   useEffect(() => {
     setLoading(true)
@@ -54,14 +57,27 @@ export default function SubjectResourcesPage({ category, categoryLabel, descript
   return (
     <div className="p-8 max-w-4xl">
       {/* 헤더 */}
-      <div className="flex items-center gap-3 mb-6">
-        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${color}`}>
-          {categoryLabel}
-        </span>
-        <div>
-          <h1 className="text-xl font-bold text-[#1a2a4a]">{categoryLabel}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{description}</p>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${color}`}>
+            {categoryLabel}
+          </span>
+          <div>
+            <h1 className="text-xl font-bold text-[#1a2a4a]">{categoryLabel}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{description}</p>
+          </div>
         </div>
+        {isAdmin && (
+          <Link
+            href="/admin/resources"
+            className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 bg-[#c9a84c] text-[#1a2a4a] rounded-lg hover:bg-[#b8943e] transition-colors whitespace-nowrap"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            업로드
+          </Link>
+        )}
       </div>
 
       {/* 탭 */}

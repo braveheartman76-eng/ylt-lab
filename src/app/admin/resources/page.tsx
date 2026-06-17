@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Material, MaterialCategory, FileType } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 
 const CATEGORIES: MaterialCategory[] = ['형법', '형사소송법', '교정학', '노동법']
 const ALLOWED_EXT = ['.pdf', '.hwpx', '.docx']
@@ -40,6 +42,9 @@ function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
 }
 
 export default function AdminResourcesPage() {
+  const { isAdmin, isLoading } = useAuth()
+  const router = useRouter()
+
   // ---- Upload state ----
   const [file, setFile]         = useState<File | null>(null)
   const [title, setTitle]       = useState('')
@@ -150,6 +155,28 @@ export default function AdminResourcesPage() {
     : materials.filter((m) => m.category === filterCat)
 
   const canUpload = file && title.trim() && category && !uploading
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Spinner className="h-6 w-6 text-gray-400" />
+      </div>
+    )
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-gray-500 font-medium">관리자만 접근할 수 있습니다.</p>
+        <button
+          onClick={() => router.push('/login')}
+          className="text-sm text-[#1a2a4a] underline hover:no-underline"
+        >
+          로그인 페이지로 이동
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="p-8 max-w-4xl">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { Material, MaterialCategory } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 
 type FilterCategory = 'ALL' | MaterialCategory
 
@@ -205,16 +206,12 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
 
 // ---- Main Page ----
 export default function ResourcesPage() {
+  const { isAdmin } = useAuth()
   const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState<string | null>(null)
   const [filter, setFilter]       = useState<FilterCategory>('ALL')
-  const [isAdmin, setIsAdmin]     = useState(false)
   const [showUpload, setShowUpload] = useState(false)
-
-  useEffect(() => {
-    setIsAdmin(localStorage.getItem('isAdmin') === 'true')
-  }, [])
 
   useEffect(() => {
     async function fetchMaterials() {
