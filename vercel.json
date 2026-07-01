@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/exams/close-expired",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

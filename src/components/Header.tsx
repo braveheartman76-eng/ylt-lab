@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context'
 const navItems = [
   { label: '홈', href: '/' },
   { label: '자료실', href: '/resources' },
+  { label: '모의고사', href: '/exams' },
   { label: '오탈자검수', href: '/proofreading' },
   { label: '관리자', href: '/admin' },
 ]

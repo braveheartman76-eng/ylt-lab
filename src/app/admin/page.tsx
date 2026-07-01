@@ -7,6 +7,13 @@ const adminMenus = [
     icon: '📁',
   },
   {
+    title: '모의고사 관리',
+    desc: 'CBT 모의고사 생성 및 문제 관리',
+    href: '/admin/exams',
+    count: '',
+    icon: '📝',
+  },
+  {
     title: '검수 관리',
     desc: '오탈자 검수 요청 처리 및 배정',
     href: '/admin/proofreading',

@@ -8,6 +8,8 @@ export type Role = 'admin' | 'student'
 export type MaterialCategory = '형법' | '형사소송법' | '교정학' | '노동법'
 export type FileType = 'open' | 'study'
 export type QuizType = 'MCQ' | 'OX'
+export type ExamStatus = 'draft' | 'published' | 'closed'
+export type SessionStatus = 'in_progress' | 'submitted' | 'expired'
 
 // ============================================================
 // Database 타입 — supabase-js v2 GenericSchema 구조 준수
@@ -202,6 +204,115 @@ export type Database = {
           }
         ]
       }
+      exams: {
+        Row: {
+          id: string
+          title: string
+          subject: string
+          time_limit_minutes: number
+          start_at: string
+          end_at: string
+          status: ExamStatus
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          subject: string
+          time_limit_minutes?: number
+          start_at: string
+          end_at: string
+          status?: ExamStatus
+          created_at?: string
+        }
+        Update: {
+          title?: string
+          subject?: string
+          time_limit_minutes?: number
+          start_at?: string
+          end_at?: string
+          status?: ExamStatus
+        }
+        Relationships: []
+      }
+      exam_questions: {
+        Row: {
+          id: string
+          exam_id: string
+          question_id: string
+          order: number
+          points: number
+        }
+        Insert: {
+          id?: string
+          exam_id: string
+          question_id: string
+          order?: number
+          points?: number
+        }
+        Update: {
+          order?: number
+          points?: number
+        }
+        Relationships: []
+      }
+      exam_sessions: {
+        Row: {
+          id: string
+          exam_id: string
+          user_id: string
+          phone_number: string
+          status: SessionStatus
+          score: number | null
+          total_points: number | null
+          started_at: string
+          submitted_at: string | null
+        }
+        Insert: {
+          id?: string
+          exam_id: string
+          user_id: string
+          phone_number: string
+          status?: SessionStatus
+          score?: number | null
+          total_points?: number | null
+          started_at?: string
+          submitted_at?: string | null
+        }
+        Update: {
+          status?: SessionStatus
+          score?: number | null
+          total_points?: number | null
+          submitted_at?: string | null
+        }
+        Relationships: []
+      }
+      exam_answers: {
+        Row: {
+          id: string
+          session_id: string
+          exam_question_id: string
+          selected: string | null
+          is_correct: boolean | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          exam_question_id: string
+          selected?: string | null
+          is_correct?: boolean | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          selected?: string | null
+          is_correct?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }
@@ -232,3 +343,7 @@ export type Notice       = Database['public']['Tables']['notices']['Row']
 export type QuizQuestion = Database['public']['Tables']['quiz_questions']['Row']
 export type QuizAttempt  = Database['public']['Tables']['quiz_attempts']['Row']
 export type DailyQuiz    = Database['public']['Tables']['daily_quiz']['Row']
+export type Exam         = Database['public']['Tables']['exams']['Row']
+export type ExamQuestion = Database['public']['Tables']['exam_questions']['Row']
+export type ExamSession  = Database['public']['Tables']['exam_sessions']['Row']
+export type ExamAnswer   = Database['public']['Tables']['exam_answers']['Row']

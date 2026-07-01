@@ -37,11 +37,20 @@ const menu = [
     ],
   },
   {
+    title: '모의고사',
+    href: '/exams',
+    adminOnly: false,
+    items: [
+      { label: '시험 목록', href: '/exams' },
+    ],
+  },
+  {
     title: '관리자',
     href: '/admin',
     adminOnly: false,
     items: [
       { label: '자료 관리', href: '/admin/resources' },
+      { label: '모의고사 관리', href: '/admin/exams' },
       { label: '검수 관리', href: '/admin/proofreading' },
       { label: '회원 관리', href: '/admin/users' },
       { label: '설정', href: '/admin/settings' },
