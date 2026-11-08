@@ -45,3 +45,6 @@ next-env.d.ts
 # python
 __pycache__/
 *.pyc
+
+# 게임 로컬 문제 데이터 (실제 교재 변환물 — 검수 전/저작권 자료라 커밋하지 않음)
+/public/game-data/questions.local.json

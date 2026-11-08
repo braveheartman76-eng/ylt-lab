@@ -9,8 +9,8 @@
   * 정답·○×·해설은 원본에 적힌 값만 사용한다. 추정/생성하지 않는다.
   * 문제편과 해설편의 문제 재수록 본문을 서로 대조한다. 다르면 경고.
   * PDF 줄바꿈은 글자 단위라 줄 끝의 띄어쓰기 유무가 소실된다.
-    같은 문장이 두 PDF 에 서로 다른 줄바꿈으로 실려 있으므로 두 쪽을 맞춰 복원하고,
-    복원 불가능한 자리는 붙여 쓰고 ambiguous_breaks 로 보고한다. (HWPX 원본이 오면 해소)
+    같은 문장이 두 PDF 에 재수록되어 있어 대조를 시도하지만, 실측 결과 두 PDF 의 줄바꿈 위치가 같아
+    복원되는 자리가 없다(제1회 기준 0건). 복원 불가 자리는 붙여 쓰고 ambiguous_breaks 로 보고한다. (HWPX 원본이 오면 해소)
   * 선지에서 뽑은 OX 변형 문항은 원 문항과 분리된 파생 문항(pending)이며, 검수 전에는 출제되지 않는다.
   * DB 에 직접 쓰지 않는다. JSONL + 리포트 + SQL 시드만 만든다.
 외부 도구: poppler 의 pdftotext
@@ -402,7 +402,7 @@ def report(qs: list[Q], derived: list[dict], expected: int | None) -> dict:
         "derived_ox_answer_O": sum(d["answer"] == "O" for d in derived),
         "derived_ox_answer_X": sum(d["answer"] == "X" for d in derived),
         "warnings": {f"{q.no:02d}": q.warnings for q in qs if q.warnings},
-        "note": "PDF 입력: 줄 끝 띄어쓰기는 두 PDF 대조로 복원, 양쪽 모두 줄바꿈인 자리만 모호. HWPX 원본 수령 시 재변환 권장.",
+        "note": "PDF 입력: 줄바꿈 자리의 띄어쓰기는 복원되지 않고 붙여쓰기로 처리됨(두 PDF 줄바꿈이 동일). HWPX 원본 수령 시 재변환 권장.",
     }
 
 

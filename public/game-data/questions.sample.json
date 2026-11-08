@@ -1,0 +1,174 @@
+{
+ "version": 1,
+ "source": "sample",
+ "questions": [
+  {
+   "id": "test-ox-1",
+   "type": "ox",
+   "unitId": "u-test-1",
+   "unitTitle": "[테스트] 가상 단원 A",
+   "statement": "[테스트] 가상 문장 1: 이 문장은 참이라고 정의한다.",
+   "answer": "O",
+   "explanation": "[테스트] 정의상 참입니다.",
+   "difficulty": 1,
+   "isTestData": true
+  },
+  {
+   "id": "test-ox-2",
+   "type": "ox",
+   "unitId": "u-test-1",
+   "unitTitle": "[테스트] 가상 단원 A",
+   "statement": "[테스트] 가상 문장 2: 이 문장은 거짓이라고 정의한다.",
+   "answer": "X",
+   "explanation": "[테스트] 정의상 거짓입니다.",
+   "difficulty": 1,
+   "isTestData": true
+  },
+  {
+   "id": "test-ox-3",
+   "type": "ox",
+   "unitId": "u-test-1",
+   "unitTitle": "[테스트] 가상 단원 A",
+   "statement": "[테스트] 가상 문장 3: 이 문장은 참이라고 정의한다.",
+   "answer": "O",
+   "explanation": "[테스트] 정의상 참입니다.",
+   "difficulty": 2,
+   "isTestData": true
+  },
+  {
+   "id": "test-ox-4",
+   "type": "ox",
+   "unitId": "u-test-2",
+   "unitTitle": "[테스트] 가상 단원 B",
+   "statement": "[테스트] 가상 문장 4: 이 문장은 거짓이라고 정의한다.",
+   "answer": "X",
+   "explanation": "[테스트] 정의상 거짓입니다.",
+   "difficulty": 2,
+   "isTestData": true
+  },
+  {
+   "id": "test-ox-5",
+   "type": "ox",
+   "unitId": "u-test-2",
+   "unitTitle": "[테스트] 가상 단원 B",
+   "statement": "[테스트] 가상 문장 5: 이 문장은 참이라고 정의한다.",
+   "answer": "O",
+   "explanation": "[테스트] 정의상 참입니다.",
+   "difficulty": 3,
+   "isTestData": true
+  },
+  {
+   "id": "test-ox-6",
+   "type": "ox",
+   "unitId": "u-test-2",
+   "unitTitle": "[테스트] 가상 단원 B",
+   "statement": "[테스트] 가상 문장 6: 이 문장은 거짓이라고 정의한다.",
+   "answer": "X",
+   "explanation": "[테스트] 정의상 거짓입니다.",
+   "difficulty": 4,
+   "isTestData": true
+  },
+  {
+   "id": "test-mcq-1",
+   "type": "mcq",
+   "unitId": "u-test-1",
+   "unitTitle": "[테스트] 가상 단원 A",
+   "statement": "[테스트] 가상 설명으로 옳지 않은 것은?",
+   "choices": [
+    {
+     "no": "1",
+     "text": "[테스트] 가상 선지 하나(참)"
+    },
+    {
+     "no": "2",
+     "text": "[테스트] 가상 선지 둘(참)"
+    },
+    {
+     "no": "3",
+     "text": "[테스트] 가상 선지 셋(거짓)"
+    },
+    {
+     "no": "4",
+     "text": "[테스트] 가상 선지 넷(참)"
+    }
+   ],
+   "answer": "3",
+   "explanation": "[테스트] ③이 거짓입니다.",
+   "difficulty": 2,
+   "isTestData": true,
+   "stemNote": "가상 공통 단서: 다툼이 있으면 판례에 의함"
+  },
+  {
+   "id": "test-mcq-2",
+   "type": "mcq",
+   "unitId": "u-test-2",
+   "unitTitle": "[테스트] 가상 단원 B",
+   "statement": "[테스트] 가상 보기 중 옳은 것만을 모두 고르면?",
+   "choices": [
+    {
+     "no": "1",
+     "text": "[테스트] ㄱ, ㄴ"
+    },
+    {
+     "no": "2",
+     "text": "[테스트] ㄱ, ㄷ"
+    },
+    {
+     "no": "3",
+     "text": "[테스트] ㄴ, ㄷ"
+    },
+    {
+     "no": "4",
+     "text": "[테스트] ㄱ, ㄴ, ㄷ"
+    }
+   ],
+   "answer": "2",
+   "explanation": "[테스트] ㄱ, ㄷ이 참입니다.",
+   "difficulty": 3,
+   "isTestData": true,
+   "bogi": [
+    {
+     "label": "ㄱ",
+     "text": "[테스트] 가상 보기 하나(참)"
+    },
+    {
+     "label": "ㄴ",
+     "text": "[테스트] 가상 보기 둘(거짓)"
+    },
+    {
+     "label": "ㄷ",
+     "text": "[테스트] 가상 보기 셋(참)"
+    }
+   ]
+  },
+  {
+   "id": "test-mcq-3",
+   "type": "mcq",
+   "unitId": "u-test-2",
+   "unitTitle": "[테스트] 가상 단원 B",
+   "statement": "[테스트] 가상 설명으로 옳은 것은?",
+   "choices": [
+    {
+     "no": "1",
+     "text": "[테스트] 가상 선지 하나(거짓)"
+    },
+    {
+     "no": "2",
+     "text": "[테스트] 가상 선지 둘(참)"
+    },
+    {
+     "no": "3",
+     "text": "[테스트] 가상 선지 셋(거짓)"
+    },
+    {
+     "no": "4",
+     "text": "[테스트] 가상 선지 넷(거짓)"
+    }
+   ],
+   "answer": "2",
+   "explanation": "[테스트] ②가 참입니다.",
+   "difficulty": 4,
+   "isTestData": true
+  }
+ ]
+}
