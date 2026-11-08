@@ -1,0 +1,39 @@
+{
+  "_comment": "추정 기반 기본 프로필입니다. 실제 문제집 샘플을 받으면 이 파일만 고쳐서 형식을 맞춥니다. markers 의 meaning 은 사용자가 확인해 준 것만 채우고, 비워두면 기호는 원문 그대로만 보존됩니다.",
+  "book_title": null,
+  "subject_id": "criminal_procedure",
+  "heading_patterns": [
+    {
+      "level": 1,
+      "regex": "^제\\s*\\d+\\s*편\\s*.+$"
+    },
+    {
+      "level": 2,
+      "regex": "^제\\s*\\d+\\s*장\\s*.+$"
+    },
+    {
+      "level": 3,
+      "regex": "^제\\s*\\d+\\s*절\\s*.+$"
+    }
+  ],
+  "question_regex": "^(?P<no>\\d{1,4})\\s*[.)]\\s*(?P<body>.+)$",
+  "inline_answer_regex": "\\(\\s*(?P<ans>[OX○×ox])\\s*\\)\\s*$",
+  "answer_line_regex": "^(?:정답|답)\\s*[:：]?\\s*(?P<ans>[OX○×ox])(?![A-Za-z0-9가-힣])",
+  "explanation_regex": "^(?:해설|해\\s*설|▶|☞)\\s*[:：]?\\s*(?P<exp>.*)$",
+  "marker_chars": "★☆◎●◆◇■□▲△▽※♣♠♥♦✓✔✱*",
+  "markers": {
+    "_example": {
+      "meaning": null,
+      "confirmed_by_user": false
+    }
+  },
+  "page_marker_regex": "^[-–]\\s*(?P<page>\\d{1,4})\\s*[-–]$",
+  "answer_map": {
+    "O": "O",
+    "o": "O",
+    "○": "O",
+    "X": "X",
+    "x": "X",
+    "×": "X"
+  }
+}
