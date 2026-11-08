@@ -326,7 +326,7 @@ def _polarity_check(q: Q) -> None:
     items = q.bogi if q.bogi else q.choices
     missing = [(i.get("label") or i.get("no")) for i in items if not i["verdict"]]
     if missing:
-        q.warnings.append(f"원본 ○× 표시 누락/불명: {', '.join(missing)} (PDF 텍스트 손상 가능) — 원본 확인 필요, OX 변환 제외")
+        q.warnings.append(f"원본 ○× 표시 누락/불명: {', '.join(missing)} — 원본 확인 필요, OX 변환 제외")
         return
     want = "X" if neg else "O"
     if q.bogi:

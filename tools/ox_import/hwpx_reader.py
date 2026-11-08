@@ -60,6 +60,16 @@ def read_hwpx(path: Path) -> list[Para]:
     return paras
 
 
+def _t_text(t: ET.Element) -> str:
+    """<hp:t> 의 텍스트. <hp:tab/> 같은 인라인 요소 '뒤에 이어지는 글자(tail)'도 포함해야 한다.
+    예) <hp:t>① 가<hp:tab/>② 나</hp:t> → '① 가 ② 나'  (tail 을 버리면 ② 선지가 사라진다)"""
+    parts = [t.text or ""]
+    for c in t:
+        parts.append(" " if _local(c.tag) in ("tab", "lineBreak") else "")
+        parts.append(c.tail or "")
+    return "".join(parts)
+
+
 def _direct_para_text(p: ET.Element) -> str:
     parts: list[str] = []
 
@@ -68,8 +78,8 @@ def _direct_para_text(p: ET.Element) -> str:
             name = _local(ch.tag)
             if name == "p":  # 중첩 문단은 별도 문단으로 처리
                 continue
-            if name == "t" and ch.text:
-                parts.append(ch.text)
+            if name == "t":
+                parts.append(_t_text(ch))
             elif name in ("lineBreak", "tab"):
                 parts.append(" ")
             else:

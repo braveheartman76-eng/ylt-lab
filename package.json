@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:game": "node --test tests/db/game_schema.test.mjs tests/engine/engine.test.ts tests/engine/parity.test.mjs && python3 -I -m unittest discover -s tools/ox_import/tests && python3 -I -m unittest discover -s tools/mcq_import/tests -p test_mcq.py"
+    "test:game": "node --test tests/db/game_schema.test.mjs tests/engine/engine.test.ts tests/engine/parity.test.mjs && python3 -I -m unittest discover -s tools/ox_import/tests && python3 -I -m unittest discover -s tools/mcq_import/tests -p 'test_*.py'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.2",

@@ -91,6 +91,15 @@ class ImportTest(unittest.TestCase):
             ox_import.main([str(self.f), "--book", "B", "--out", str(o)])
         self.assertEqual((o1 / "seed.sql").read_text(encoding="utf-8"), (o2 / "seed.sql").read_text(encoding="utf-8"))
 
+    def test_tab_tail_text_not_lost(self):
+        """<hp:t>① 가<hp:tab/>② 나</hp:t> 에서 탭 뒤 글자(② 나)가 사라지던 버그 회귀 방지."""
+        f = self.tmp / "tab.hwpx"
+        sec = SECTION % '<hp:p><hp:run><hp:t>① 가<hp:tab width="1" leader="0" type="1"/>② 나</hp:t></hp:run></hp:p>'
+        with zipfile.ZipFile(f, "w") as z:
+            z.writestr("Contents/section0.xml", sec)
+        paras = ox_import.read_paragraphs(f)
+        self.assertEqual(paras[0].text, "① 가 ② 나")
+
     def test_pdf_not_silently_faked(self):
         with self.assertRaises(NotImplementedError):
             ox_import.read_paragraphs(Path("x.pdf"))
