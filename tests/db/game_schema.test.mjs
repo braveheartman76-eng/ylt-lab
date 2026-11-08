@@ -169,3 +169,68 @@ test('exam_frequency requires verified status', async () => {
   await assert.rejects(db.query(`UPDATE game_question_metadata SET exam_frequency=3 WHERE question_id=$1`, [id]), /freq_requires_verified/)
   await db.query(`UPDATE game_question_metadata SET exam_frequency=3, exam_frequency_status='verified' WHERE question_id=$1`, [id])
 })
+
+// ───────── 4지선다(mcq) + 파생 OX ─────────
+async function setupMcq() {
+  const db = await setup()
+  const seed = (v) => execFileSync('python3', ['-I', 'tools/mcq_import/tests/make_fixture_seed.py', ...(v ? [String(v)] : [])], { encoding: 'utf8' })
+  await db.exec(seed())
+  await db.exec(`UPDATE game_questions SET review_status='approved'`)
+  return { db, seed }
+}
+const qb = async (db, book, no) =>
+  (await db.query(`SELECT id FROM game_questions WHERE source_book=$1 AND source_no=$2`, [book, no])).rows[0].id
+
+test('mcq: grades by choice number, rejects O/X on mcq and 1-4 on ox', async () => {
+  const { db } = await setupMcq()
+  const mcq = await qb(db, 'TEST-MCQ', '01')
+  await assert.rejects(submit(db, mcq, 'O'), /문항 유형\(mcq\)/)
+  let r = await submit(db, mcq, '1') // 정답은 3
+  assert.equal(r.is_correct, false)
+  assert.equal(r.correct_answer, '3')
+  assert.equal(r.box, 0)
+  r = await submit(db, mcq, '3')
+  assert.equal(r.is_correct, true)
+  const ox = await qb(db, 'TEST-MCQ', '01-③') // 파생 OX: 원본 표시 × → X
+  await assert.rejects(submit(db, ox, '3'), /문항 유형\(ox\)/)
+  assert.equal((await submit(db, ox, 'X')).is_correct, true)
+})
+
+test('derived OX: linked to source, pending-by-default, none from inconsistent source question', async () => {
+  const db = (await setupMcq()).db
+  const d = (await db.query(`
+    SELECT d.source_no, d.question_type, d.derived_from_label, p.source_no AS parent_no, v.answer
+      FROM game_questions d JOIN game_questions p ON p.id = d.derived_from_question_id
+      JOIN game_question_versions v ON v.id = d.current_version_id
+     ORDER BY d.source_no`)).rows
+  assert.ok(d.length >= 7)
+  assert.ok(d.every(x => x.question_type === 'ox' && ['01', '02'].includes(x.parent_no)))
+  assert.ok(!d.some(x => x.parent_no === '03'), '원본 ○×가 모순된 03번에서는 파생 금지')
+})
+
+test('playable view hides verdicts/notes for mcq choices and bogi', async () => {
+  const db = (await setupMcq()).db
+  const id = await qb(db, 'TEST-MCQ', '02')
+  const row = (await db.query(`SELECT choices, bogi FROM game_playable_questions WHERE id=$1`, [id])).rows[0]
+  const dump = JSON.stringify(row)
+  assert.ok(!dump.includes('verdict') && !dump.includes('note') && !dump.includes('가상 해설'))
+  assert.equal(row.choices.length, 4)
+  assert.equal(row.bogi.length, 3)
+})
+
+test('reimport as version 2 (e.g. PDF -> HWPX): identity kept, history points at v1', async () => {
+  const { db, seed } = await setupMcq()
+  const id = await qb(db, 'TEST-MCQ', '01')
+  await submit(db, id, '3')
+  const countQ = async () => (await db.query(`SELECT count(*)::int n FROM game_questions WHERE source_book='TEST-MCQ'`)).rows[0].n
+  const before = await countQ()
+  await db.exec(`UPDATE game_questions SET review_status='approved'`)
+  await db.exec(seed(2))
+  const vs = (await db.query(`SELECT version_no FROM game_question_versions WHERE question_id=$1 ORDER BY 1`, [id])).rows.map(x => x.version_no)
+  assert.deepEqual(vs, [1, 2])
+  const cur = (await db.query(`SELECT v.version_no FROM game_questions q JOIN game_question_versions v ON v.id=q.current_version_id WHERE q.id=$1`, [id])).rows[0]
+  assert.equal(cur.version_no, 2)
+  const at = (await db.query(`SELECT v.version_no FROM game_answer_attempts a JOIN game_question_versions v ON v.id=a.question_version_id WHERE a.question_id=$1`, [id])).rows[0]
+  assert.equal(at.version_no, 1)
+  assert.equal(await countQ(), before, '재가져오기가 문항을 중복 생성하지 않음')
+})

@@ -67,7 +67,10 @@ CREATE TABLE IF NOT EXISTS game_questions (
   unit_id            UUID REFERENCES game_units(id),     -- 소단원(없으면 상위 단원)
   source_book        TEXT NOT NULL,                      -- 원본 교재명
   source_page        INTEGER,                            -- 원본 페이지 (추출 불가 시 NULL)
-  source_no          TEXT NOT NULL,                      -- 원본 문제번호
+  source_no          TEXT NOT NULL,                      -- 원본 문제번호 (파생 OX 는 '01-①' 형태)
+  question_type      TEXT NOT NULL DEFAULT 'ox' CHECK (question_type IN ('ox','mcq')),
+  derived_from_question_id UUID REFERENCES game_questions(id), -- 4지선다 선지에서 뽑은 OX 변형 문항
+  derived_from_label TEXT,                               -- 원 문항의 선지/보기 번호 (①, ㉠ ...)
   import_batch_id    UUID REFERENCES game_import_batches(id),
   current_version_id UUID,                               -- FK 는 아래에서 추가 (순환 참조)
   review_status      TEXT NOT NULL DEFAULT 'pending'
@@ -88,8 +91,11 @@ CREATE TABLE IF NOT EXISTS game_question_versions (
   question_id      UUID NOT NULL REFERENCES game_questions(id),
   version_no       INTEGER NOT NULL,
   statement        TEXT NOT NULL,                        -- 문제 원문 (보존)
-  answer           CHAR(1) NOT NULL CHECK (answer IN ('O','X')),
+  answer           CHAR(1) NOT NULL CHECK (answer IN ('O','X','1','2','3','4')), -- ox: O/X, mcq: 1~4
   explanation      TEXT,                                 -- 원본 해설 (보존)
+  stem_note        TEXT,                                 -- 지문 공통 단서 (예: 다툼이 있으면 판례에 의함) / 파생 문항의 원 발문
+  bogi             JSONB,                                -- mcq 보기 [{label,text,verdict,note}]
+  choices          JSONB NOT NULL DEFAULT '[]'::jsonb,   -- mcq 선지 [{no,text,verdict,note}] (verdict=원본 ○/× 표시)
   raw_markers      JSONB NOT NULL DEFAULT '[]'::jsonb,   -- 원본 표시 기호 (해석 없이 원문 그대로)
   law_basis_date   DATE,                                 -- 관련 법령 기준일
   change_note      TEXT,
@@ -171,7 +177,7 @@ CREATE TABLE IF NOT EXISTS game_answer_attempts (
   question_id         UUID NOT NULL REFERENCES game_questions(id),
   question_version_id UUID NOT NULL REFERENCES game_question_versions(id),
   attempted_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  selected            CHAR(1) NOT NULL CHECK (selected IN ('O','X')),
+  selected            CHAR(1) NOT NULL CHECK (selected IN ('O','X','1','2','3','4')),
   is_correct          BOOLEAN NOT NULL,
   elapsed_ms          INTEGER CHECK (elapsed_ms >= 0),
   attempt_no          INTEGER NOT NULL,          -- 이 학생의 이 문항 n번째 풀이
@@ -343,13 +349,17 @@ DECLARE
   v_now       TIMESTAMPTZ := NOW();
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION '로그인이 필요합니다'; END IF;
-  IF p_selected NOT IN ('O','X') THEN RAISE EXCEPTION 'selected 는 O 또는 X'; END IF;
+  IF p_selected NOT IN ('O','X','1','2','3','4') THEN RAISE EXCEPTION 'selected 는 O/X 또는 1~4'; END IF;
 
   SELECT * INTO v_q FROM game_questions WHERE id = p_question_id;
   IF NOT FOUND OR v_q.review_status <> 'approved' OR NOT v_q.is_active THEN
     RAISE EXCEPTION '출제 가능한 문항이 아닙니다';
   END IF;
   SELECT * INTO v_ver FROM game_question_versions WHERE id = v_q.current_version_id;
+  IF (v_q.question_type = 'ox'  AND p_selected NOT IN ('O','X'))
+  OR (v_q.question_type = 'mcq' AND p_selected NOT IN ('1','2','3','4')) THEN
+    RAISE EXCEPTION '문항 유형(%)에 맞지 않는 선택입니다', v_q.question_type;
+  END IF;
 
   v_correct := (p_selected = v_ver.answer);
 
@@ -434,9 +444,9 @@ END $$;
 
 -- 오늘 복습할 문항 (본인 것만, 정답은 노출하지 않음)
 CREATE OR REPLACE FUNCTION game_due_reviews(p_limit INTEGER DEFAULT 20)
-RETURNS TABLE(question_id UUID, statement TEXT, box SMALLINT, wrong_count INTEGER, next_review_at TIMESTAMPTZ)
+RETURNS TABLE(question_id UUID, question_type TEXT, statement TEXT, box SMALLINT, wrong_count INTEGER, next_review_at TIMESTAMPTZ)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT s.question_id, v.statement, s.box, s.wrong_count, s.next_review_at
+  SELECT s.question_id, q.question_type, v.statement, s.box, s.wrong_count, s.next_review_at
     FROM game_review_schedules s
     JOIN game_questions q ON q.id = s.question_id AND q.review_status='approved' AND q.is_active
     JOIN game_question_versions v ON v.id = q.current_version_id
@@ -447,7 +457,12 @@ $$;
 
 -- 학생에게 정답을 노출하지 않고 문항 본문만 제공
 CREATE OR REPLACE VIEW game_playable_questions AS
-SELECT q.id, q.subject_id, q.unit_id, v.statement, m.difficulty_initial, m.importance
+SELECT q.id, q.subject_id, q.unit_id, q.question_type, v.statement, v.stem_note,
+       (SELECT jsonb_agg(jsonb_build_object('label', b->>'label', 'text', b->>'text'))
+          FROM jsonb_array_elements(v.bogi) b) AS bogi,            -- 정답/해설(verdict, note) 제외
+       (SELECT jsonb_agg(jsonb_build_object('no', c->>'no', 'text', c->>'text'))
+          FROM jsonb_array_elements(v.choices) c) AS choices,
+       m.difficulty_initial, m.importance
   FROM game_questions q
   JOIN game_question_versions v ON v.id = q.current_version_id
   LEFT JOIN game_question_metadata m ON m.question_id = q.id
