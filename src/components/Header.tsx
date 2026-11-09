@@ -17,7 +17,7 @@ export default function Header() {
   const { profile, isLoading, signOut } = useAuth()
 
   return (
-    <header className="h-16 bg-[#1a2a4a] text-white flex items-center justify-between px-6 shadow-lg z-20 flex-shrink-0">
+    <header className="print:hidden h-16 bg-[#1a2a4a] text-white flex items-center justify-between px-6 shadow-lg z-20 flex-shrink-0">
       <Link href="/" className="flex items-center gap-3">
         <div className="w-9 h-9 bg-[#c9a84c] rounded flex items-center justify-center text-[#1a2a4a] font-bold text-base select-none">
           형

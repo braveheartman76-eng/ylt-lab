@@ -2,7 +2,7 @@
 
 export default function FloatingButtons() {
   return (
-    <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50">
+    <div className="print:hidden fixed bottom-6 right-6 flex flex-col gap-3 z-50">
       {/* 카카오톡 오픈채팅 */}
       <a
         href="#"

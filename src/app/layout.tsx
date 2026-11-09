@@ -15,13 +15,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" className={`${geist.variable} h-full`}>
-      <body className="h-full flex flex-col antialiased bg-[#f5f7fa]">
+    <html lang="ko" className={`${geist.variable} h-full print:h-auto`}>
+      <body className="h-full flex flex-col antialiased print:block print:h-auto bg-[#f5f7fa]">
         <AuthProvider>
           <Header />
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 overflow-hidden print:block print:overflow-visible">
             <Sidebar />
-            <main className="flex-1 overflow-y-auto">
+            <main className="flex-1 overflow-y-auto print:overflow-visible">
               {children}
             </main>
           </div>

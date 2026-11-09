@@ -45,6 +45,14 @@ const menu = [
     ],
   },
   {
+    title: 'OMR 카드',
+    href: '/omr',
+    adminOnly: false,
+    items: [
+      { label: 'OMR 답안지 인쇄', href: '/omr' },
+    ],
+  },
+  {
     title: '관리자',
     href: '/admin',
     adminOnly: false,
@@ -75,7 +83,7 @@ export default function Sidebar() {
   )
 
   return (
-    <aside className="w-52 bg-[#152238] text-white flex-shrink-0 overflow-y-auto">
+    <aside className="print:hidden w-52 bg-[#152238] text-white flex-shrink-0 overflow-y-auto">
       <nav className="py-3">
         {visibleMenu.map((section) => {
           const isActive = section === activeSection
