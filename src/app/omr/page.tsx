@@ -5,7 +5,6 @@ import { useMemo, useState } from 'react'
 const SUBJECTS = ['형법', '형사소송법'] as const
 type Subject = (typeof SUBJECTS)[number]
 
-const ROUNDS = 10 // 과목별 회차 수
 const QUESTIONS = 80 // OMR 문항 수 (실제 문제 수는 80문제 미만)
 const COLUMNS = 4
 const ROWS = QUESTIONS / COLUMNS
@@ -13,16 +12,15 @@ const CHOICES = ['①', '②', '③', '④']
 
 interface Sheet {
   subject: Subject
-  round: number
 }
 
-function OmrSheet({ subject, round }: Sheet) {
+function OmrSheet({ subject }: Sheet) {
   return (
     <section className="omr-sheet">
       <header className="omr-title">
         <p className="omr-lab">이윤탁 형사법 연구실 · 모의고사 스터디</p>
         <h2>
-          {subject} 모의고사 제 <span className="omr-round">{round}</span> 회 답안지
+          {subject} 모의고사 제 <span className="omr-round" /> 회 답안지
         </h2>
       </header>
 
@@ -64,15 +62,11 @@ function OmrSheet({ subject, round }: Sheet) {
 
 export default function OmrPage() {
   const [subject, setSubject] = useState<Subject | 'all'>('all')
-  const [round, setRound] = useState<number | 'all'>('all')
 
-  const sheets = useMemo<Sheet[]>(() => {
-    const subjects = subject === 'all' ? SUBJECTS : [subject]
-    const rounds = round === 'all'
-      ? Array.from({ length: ROUNDS }, (_, i) => i + 1)
-      : [round]
-    return subjects.flatMap((s) => rounds.map((r) => ({ subject: s, round: r })))
-  }, [subject, round])
+  const sheets = useMemo<Sheet[]>(
+    () => (subject === 'all' ? SUBJECTS : [subject]).map((s) => ({ subject: s })),
+    [subject],
+  )
 
   return (
     <div className="omr-page">
@@ -81,7 +75,7 @@ export default function OmrPage() {
       <div className="omr-controls print:hidden">
         <h1 className="text-xl font-bold text-[#1a2a4a]">OMR 답안지</h1>
         <p className="text-sm text-gray-500 mt-1">
-          80문항 · 4지선다 · 형법 {ROUNDS}회 + 형사소송법 {ROUNDS}회 (총 {SUBJECTS.length * ROUNDS}장). A4 용지로 인쇄하세요.
+          80문항 · 4지선다 · 형법 1장 + 형사소송법 1장. 회차는 인쇄 후 직접 적어 쓰고, 여러 장 복사해서 사용하세요.
         </p>
 
         <div className="flex flex-wrap items-center gap-3 mt-4">
@@ -94,19 +88,6 @@ export default function OmrPage() {
             >
               <option value="all">전체</option>
               {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </label>
-          <label className="text-sm text-gray-600">
-            회차{' '}
-            <select
-              value={round}
-              onChange={(e) => setRound(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="ml-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-            >
-              <option value="all">전체</option>
-              {Array.from({ length: ROUNDS }, (_, i) => i + 1).map((r) => (
-                <option key={r} value={r}>{r}회</option>
-              ))}
             </select>
           </label>
           <button
@@ -122,7 +103,7 @@ export default function OmrPage() {
       </div>
 
       <div className="omr-sheets">
-        {sheets.map((s) => <OmrSheet key={`${s.subject}-${s.round}`} {...s} />)}
+        {sheets.map((s) => <OmrSheet key={s.subject} {...s} />)}
       </div>
     </div>
   )
@@ -142,7 +123,7 @@ const css = `
 .omr-title { text-align: center; border-bottom: 2px solid #111; padding-bottom: 3mm; }
 .omr-lab { font-size: 9pt; color: #444; margin: 0 0 1mm; }
 .omr-title h2 { font-size: 18pt; font-weight: 700; margin: 0; letter-spacing: .02em; }
-.omr-round { display: inline-block; min-width: 1.4em; border-bottom: 1.5px solid #111; }
+.omr-round { display: inline-block; min-width: 1.6em; height: 1em; vertical-align: bottom; border-bottom: 1.5px solid #111; }
 
 .omr-info { display: flex; gap: 6mm; margin-top: 4mm; font-size: 10pt; }
 .omr-info > div { display: flex; align-items: flex-end; gap: 2mm; flex: 1; }
