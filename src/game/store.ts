@@ -13,14 +13,14 @@ export interface SavedGame {
   track: string
   hero: 'male' | 'female' // 선택한 헌터 캐릭터
   pet: string | null // 함께 다니는 펫(해금된 것 중 선택). null 이면 해금된 첫 번째
-  sfx: { enabled: boolean; volume: number } // 효과음
+  sfx: { enabled: boolean; volume: number; bgm?: boolean } // 효과음 / 전투 배경음악(기본 꺼짐)
 }
 
 const KEY = 'ylt-game-v1'
 
 export const emptyGame = (): SavedGame => ({
   v: 1, schedules: {}, attempts: [], xp: 0, coins: 0, stage: 1, stageKills: 0, items: [],
-  tts: { enabled: false, rate: 1 }, track: 'police', hero: 'male', pet: null, sfx: { enabled: true, volume: 0.6 },
+  tts: { enabled: false, rate: 1 }, track: 'police', hero: 'male', pet: null, sfx: { enabled: true, volume: 0.6, bgm: false },
 })
 
 export function loadGame(): SavedGame {

@@ -20,6 +20,8 @@ export interface HunterAssets {
   gates: { displayHeight: number; byTitle: Map<string, GateArt> }
 }
 
+import { pickTemplate, wrapTitle } from './gates.ts'
+
 const ROOT = '/hunter-assets/'
 
 function load(src: string): Promise<HTMLImageElement> {
@@ -97,4 +99,14 @@ export function peekImage(src: string): HTMLImageElement | null {
     load(ROOT + src).then(img => cache.set(src, img), () => cache.set(src, 'error')) // manifest 의 src 는 'progression/…' 로 시작
   }
   return null
+}
+
+/** 소제목에 맞는 문: 전용 그림이 있으면 그것, 없으면 사용자가 그린 문 그림을 틀로 쓰고 소제목 이름을 붙인다(같은 대제목 = 같은 문). */
+export function gateArtFor(g: HunterAssets['gates'], section: string, topic: string): GateArt | undefined {
+  const own = g.byTitle.get(topic)
+  if (own) return own
+  const list = [...g.byTitle.values()]
+  if (!list.length) return undefined
+  const tpl = pickTemplate(list, section)
+  return { ...tpl, title: topic, labelLines: wrapTitle(topic) }
 }
