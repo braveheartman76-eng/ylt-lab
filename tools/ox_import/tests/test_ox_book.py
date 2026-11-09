@@ -48,11 +48,15 @@ class OxBookTest(unittest.TestCase):
         self.assertEqual(qs[1].source_exams, ["19년 일경2차", "23·25년 경승"])
         self.assertTrue(qs[1].statement.endswith("정의한다."))
 
-    def test_markers_preserved_never_interpreted(self):
+    def test_markers_preserved_meaning_only_as_confirmed(self):
         qs = self.parse()
         self.assertEqual([q.marker for q in qs], ["Ⓒ", None, "Ⓐ", "Ⓑ"])
         rep = ob.validate(qs)
-        self.assertEqual(rep["unconfirmed_marker_symbols"], ["Ⓐ", "Ⓑ", "Ⓒ"])
+        self.assertEqual(rep["unconfirmed_marker_symbols"], [])  # Ⓐ/Ⓑ/Ⓒ 는 사용자가 '반복빈도'라고 확인
+        sql = ob.build_sql(qs, "B", "criminal_procedure", "e" * 64, "t", True)
+        self.assertIn("반복빈도 등급(저자 표시)", sql)
+        self.assertNotIn("높음", sql)  # 등급의 방향은 확인받지 않았으므로 추정해 쓰지 않는다
+        self.assertIn("'unverified'", sql)  # 반복빈도 표시를 출제빈도 숫자로 바꾸지 않는다
 
     def test_revision_note_flagged_and_law_date_from_note_only(self):
         qs = self.parse()

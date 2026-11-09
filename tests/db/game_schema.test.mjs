@@ -250,9 +250,9 @@ test('ox book import: unit tree, sources(unverified), raw markers, law date, sco
   const src = (await db.query(`SELECT count(*)::int n, bool_or(is_verified) v FROM game_question_sources s JOIN game_questions q ON q.id=s.question_id WHERE q.source_book LIKE 'TEST-OX%'`)).rows[0]
   assert.deepEqual(src, { n: 5, v: false })
   assert.equal((await db.query(`SELECT count(*)::int n FROM game_question_metadata m JOIN game_questions q ON q.id=m.question_id WHERE q.source_book LIKE 'TEST-OX%' AND (m.exam_frequency IS NOT NULL OR m.exam_frequency_status<>'unverified')`)).rows[0].n, 0)
-  // 기호 원문 보존(의미 null), 개정 반영 날짜는 주석에서만
+  // 기호 원문 보존 + 사용자가 확인한 뜻(반복빈도)만 기록(출제빈도 숫자로는 쓰지 않음), 개정 반영 날짜는 주석에서만
   const mk = (await db.query(`SELECT v.raw_markers m, v.law_basis_date::text d FROM game_questions q JOIN game_question_versions v ON v.id=q.current_version_id WHERE q.source_book LIKE 'TEST-OX%' AND q.source_no='1' ORDER BY q.source_book`)).rows
-  assert.ok(mk.every(r => r.m[0].meaning === null && r.d === null))
+  assert.ok(mk.every(r => r.m[0].meaning === '반복빈도 등급(저자 표시)' && r.m[0].confirmed_by_user === true && r.d === null))
   assert.equal((await db.query(`SELECT v.law_basis_date::text d FROM game_questions q JOIN game_question_versions v ON v.id=q.current_version_id WHERE q.source_book LIKE 'TEST-OX%' AND q.source_no='2'`)).rows[0].d, '2026-08-04')
   // 채점은 OX 규칙 그대로
   const id = (await db.query(`SELECT id FROM game_questions WHERE source_book LIKE 'TEST-OX%' AND source_no='1-1'`)).rows[0].id

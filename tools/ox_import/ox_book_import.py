@@ -9,7 +9,7 @@
 
 원칙
   * 문제 원문·정답·해설은 가공하지 않는다. 정답은 원본에 적힌 ○/× 만 사용한다.
-  * 문제 옆 기호(Ⓐ Ⓑ Ⓒ)는 의미를 해석하지 않고 원문 그대로 raw_markers 에 보존한다(의미는 사용자 확인 후).
+  * 문제 옆 기호(Ⓐ Ⓑ Ⓒ)는 원문 그대로 raw_markers 에 보존한다. 뜻은 사용자가 확인해 준 것('반복빈도')만 기록하고 출제에는 반영하지 않는다.
   * 출제 정보(예: '19년 일경2차 / 23년 경승')는 출처 기록(past_exam, 미검증)으로만 저장하고 출제빈도는 '미확인' 유지.
   * 해설에 '개정 반영 … 확인 요망' 같은 저자 주석이 있으면 경고(검수 필요). 법령 기준일은 주석에 적힌 날짜만 사용.
   * DB 에 직접 쓰지 않는다. JSONL + 리포트 + SQL 시드만 만들고, 모든 문항은 pending.
@@ -32,6 +32,9 @@ from hwpx_reader import read_paragraphs  # noqa: E402
 from ox_import import NS, sql_str  # noqa: E402
 
 MARKER_CHARS = "ⒶⒷⒸⒹⒺ"
+# 사용자 확인: Ⓐ/Ⓑ/Ⓒ 는 '반복빈도' 표시(게임 출제에는 반영하지 않음). 등급의 방향(Ⓐ가 높은지)은 확인받지 않았으므로 기록하지 않는다.
+# 저자 표시일 뿐 검증된 기출 횟수가 아니므로 exam_frequency(출제빈도 숫자)로 바꾸지 않는다.
+MARKER_MEANING = {m: "반복빈도 등급(저자 표시)" for m in "ⒶⒷⒸ"}
 H1 = re.compile(r"^■\s*(.+)$")
 H2 = re.compile(r"^▸\s*(.+)$")
 Q_RE = re.compile(rf"^(?P<mk>[{MARKER_CHARS}])?\s*(?P<no>\d+(?:-\d+)*)\s+(?P<body>\S.*)$")
@@ -145,8 +148,8 @@ def validate(qs: list[OxQ]) -> dict:
         "no_marker": sum(q.marker is None for q in qs),
         "questions_with_warnings": sum(bool(q.warnings) for q in qs),
         "warnings": {f"{q.section[:12]}#{q.no}": q.warnings for q in qs if q.warnings},
-        "unconfirmed_marker_symbols": sorted({q.marker for q in qs if q.marker}),
-        "note": "마커(Ⓐ/Ⓑ/Ⓒ) 의미는 해석하지 않음(사용자 확인 필요). 출제빈도는 '미확인'.",
+        "unconfirmed_marker_symbols": sorted({q.marker for q in qs if q.marker and q.marker not in MARKER_MEANING}),
+        "note": "마커 Ⓐ/Ⓑ/Ⓒ = 반복빈도 표시(사용자 확인). 원문 그대로 보존만 하고 출제·출제빈도 계산에는 쓰지 않음.",
     }
 
 
@@ -179,7 +182,7 @@ def build_sql(qs: list[OxQ], book: str, subject_id: str, sha: str, src: str, tes
         qid = uuid.uuid5(NS, f"q:{sc}:{q.no}")
         vid = uuid.uuid5(NS, f"v:{sc}:{q.no}:1")
         unit = units[tuple([q.section] + ([q.topic] if q.topic else []))]
-        markers = [{"symbol": q.marker, "position": "leading", "meaning": None}] if q.marker else []
+        markers = [{"symbol": q.marker, "position": "leading", "meaning": MARKER_MEANING.get(q.marker), "confirmed_by_user": q.marker in MARKER_MEANING}] if q.marker else []
         L.append("INSERT INTO game_questions(id,subject_id,unit_id,source_book,source_page,source_no,question_type,import_batch_id,current_version_id,review_status,is_test_data) VALUES "
                  f"('{qid}','{subject_id}','{unit}',{sql_str(sc)},NULL,{sql_str(q.no)},'ox','{batch}','{vid}','pending',{T}) ON CONFLICT DO NOTHING;")
         L.append("INSERT INTO game_question_versions(id,question_id,version_no,statement,answer,explanation,raw_markers,law_basis_date) VALUES "
