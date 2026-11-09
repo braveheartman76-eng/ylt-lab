@@ -48,3 +48,5 @@ __pycache__/
 
 # 게임 로컬 문제 데이터 (실제 교재 변환물 — 검수 전/저작권 자료라 커밋하지 않음)
 /public/game-data/questions.local.json
+
+# game-content/questions.json 은 비공개 문제 원본(검수 전). 저장소가 공개되면 노출되므로 공개 전 반드시 제외할 것.

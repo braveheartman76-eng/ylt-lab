@@ -255,9 +255,9 @@ export default function GameClient() {
 
           {current && phase !== 'idle' && (
             <div className="mt-2 rounded-xl bg-white p-3 shadow-sm">
-              <div className="mb-1 flex items-center justify-between text-[11px] text-gray-500">
-                <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">{KIND_LABEL[current.kind]}</span>
-                <span>{q!.unitTitle}{q!.isTestData ? ' · 테스트' : ''}{q!.derivedFrom ? ' · 선지 변형' : ''}</span>
+              <div className="mb-1 flex items-start justify-between gap-2 text-[11px] text-gray-500">
+                <span className="shrink-0 whitespace-nowrap rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">{KIND_LABEL[current.kind]}</span>
+                <span className="line-clamp-2 text-right">{q!.unitTitle}{q!.isTestData ? ' · 테스트' : ''}{q!.derivedFrom ? ' · 선지 변형' : ''}</span>
               </div>
               {phase === 'running' && <div className="py-6 text-center text-sm text-gray-500">{current.kind === 'critical' ? '⚠ 불시 공격이 다가온다! ' : ''}다음 문제로 달리는 중… 화면을 터치하면 점프!</div>}
               {(phase === 'question' || phase === 'feedback') && (
@@ -295,14 +295,14 @@ export default function GameClient() {
             <p className="mt-2 text-center text-sm text-gray-500">{reviewOnly ? '지금은 복습할 문제가 없어요.' : '출제할 문제가 없습니다.'}</p>
           )}
 
-          <div className="mt-3 flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs shadow-sm">
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-white px-3 py-2 text-xs shadow-sm [&_label]:whitespace-nowrap">
             <label className="flex items-center gap-1"><input type="checkbox" checked={game.tts.enabled} disabled={!ttsSupported()}
               onChange={e => { if (e.target.checked) unlockTts(); else stopSpeaking(); setGame(g => ({ ...g, tts: { ...g.tts, enabled: e.target.checked } })) }} /> 음성 읽기{!ttsSupported() && ' (미지원)'}</label>
             <label className="flex items-center gap-1"><input type="checkbox" checked={game.sfx.enabled}
               onChange={e => { if (e.target.checked) unlockSfx(); setGame(g => ({ ...g, sfx: { ...g.sfx, enabled: e.target.checked } })); if (e.target.checked) window.setTimeout(() => playSfx('coin'), 50) }} /> 효과음</label>
-            <label className="flex items-center gap-1">속도 <input type="range" min={0.7} max={1.5} step={0.1} value={game.tts.rate}
+            <label className="flex items-center gap-1">속도 <input type="range" className="w-24" min={0.7} max={1.5} step={0.1} value={game.tts.rate}
               onChange={e => setGame(g => ({ ...g, tts: { ...g.tts, rate: Number(e.target.value) } }))} /> {game.tts.rate.toFixed(1)}x</label>
-            {phase !== 'idle' && <button className="rounded bg-gray-200 px-2 py-1" onClick={() => { stopSpeaking(); setPhase('idle'); setCurrent(null) }}>그만하기</button>}
+            {phase !== 'idle' && <button className="ml-auto whitespace-nowrap rounded bg-gray-200 px-3 py-1" onClick={() => { stopSpeaking(); setPhase('idle'); setCurrent(null) }}>그만하기</button>}
           </div>
         </section>
       )}
