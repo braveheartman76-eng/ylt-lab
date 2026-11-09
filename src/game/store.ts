@@ -11,13 +11,14 @@ export interface SavedGame {
   items: string[]
   tts: { enabled: boolean; rate: number }
   track: string
+  hero: 'male' | 'female' // 선택한 헌터 캐릭터
 }
 
 const KEY = 'ylt-game-v1'
 
 export const emptyGame = (): SavedGame => ({
   v: 1, schedules: {}, attempts: [], xp: 0, coins: 0, stage: 1, stageKills: 0, items: [],
-  tts: { enabled: false, rate: 1 }, track: 'police',
+  tts: { enabled: false, rate: 1 }, track: 'police', hero: 'male',
 })
 
 export function loadGame(): SavedGame {

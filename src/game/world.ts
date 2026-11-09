@@ -2,24 +2,33 @@
 
 export interface Theme {
   name: string
+  bg: 'station' | 'academy' | 'library' // public/hunter-assets/backgrounds 의 그림 (없으면 아래 도형 색으로 대체)
   sky: [string, string]
   ground: string
   accent: string
 }
 
 export const THEMES: Theme[] = [
-  { name: '노량진역', sky: ['#9bd3ff', '#e4f4ff'], ground: '#8a8f98', accent: '#3b82f6' },
-  { name: '고시원 골목', sky: ['#ffd9a8', '#fff1dd'], ground: '#9a7b5a', accent: '#f59e0b' },
-  { name: '학원가', sky: ['#c9b6ff', '#f0eaff'], ground: '#7b7f8c', accent: '#8b5cf6' },
-  { name: '독서실', sky: ['#a8e6cf', '#e8fbf2'], ground: '#6b8f7a', accent: '#10b981' },
-  { name: '강의실', sky: ['#ffc2c2', '#fff0f0'], ground: '#8f6b6b', accent: '#ef4444' },
-  { name: '모의고사장', sky: ['#b5c7d9', '#eef3f8'], ground: '#5f6b78', accent: '#475569' },
+  { name: '노량진역', bg: 'station', sky: ['#9bd3ff', '#e4f4ff'], ground: '#8a8f98', accent: '#3b82f6' },
+  { name: '고시원 골목', bg: 'academy', sky: ['#ffd9a8', '#fff1dd'], ground: '#9a7b5a', accent: '#f59e0b' },
+  { name: '학원가', bg: 'academy', sky: ['#c9b6ff', '#f0eaff'], ground: '#7b7f8c', accent: '#8b5cf6' },
+  { name: '독서실', bg: 'library', sky: ['#a8e6cf', '#e8fbf2'], ground: '#6b8f7a', accent: '#10b981' },
+  { name: '강의실', bg: 'library', sky: ['#ffc2c2', '#fff0f0'], ground: '#8f6b6b', accent: '#ef4444' },
+  { name: '모의고사장', bg: 'library', sky: ['#b5c7d9', '#eef3f8'], ground: '#5f6b78', accent: '#475569' },
 ]
 
 export const STAGE_SIZE = 5 // 스테이지당 몬스터를 쓰러뜨리는 정답 수
 export const MAX_PLAYER_HP = 3
 export const themeOf = (stage: number) => THEMES[(stage - 1) % THEMES.length]
 export const isBossStage = (stage: number) => stage % 5 === 0
+
+/** 스테이지의 몬스터 그림: 보스 스테이지는 잉크 보스, 그 외에는 5종을 순서대로 */
+const ENEMY_CYCLE = ['inkSlime', 'falsePrecedentGhost', 'prisonCage', 'hourglassGoblin', 'statuteMimic']
+export function enemyKeyFor(stage: number): string {
+  if (isBossStage(stage)) return 'inkBoss'
+  const n = stage - Math.floor(stage / 5) - 1 // 앞선 '보스가 아닌' 스테이지 수
+  return ENEMY_CYCLE[n % ENEMY_CYCLE.length]
+}
 
 export interface Item {
   id: string

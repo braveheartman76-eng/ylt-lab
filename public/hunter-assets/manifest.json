@@ -1,0 +1,136 @@
+{
+  "backgrounds": {
+    "station": {
+      "src": "backgrounds/noryangjin-station.webp",
+      "label": "노량진역",
+      "groundY": 0.76
+    },
+    "academy": {
+      "src": "backgrounds/academy-alley.webp",
+      "label": "학원가 골목",
+      "groundY": 0.76
+    },
+    "library": {
+      "src": "backgrounds/night-study-room.webp",
+      "label": "야간 자습실",
+      "groundY": 0.76
+    }
+  },
+  "characters": {
+    "male": {
+      "label": "남자 헌터",
+      "facing": "right",
+      "height": 0.36,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.96875
+      },
+      "poses": {
+        "idle": "characters/male-idle.png",
+        "run": "characters/male-run.png",
+        "attack": "characters/male-attack.png"
+      }
+    },
+    "female": {
+      "label": "여자 헌터",
+      "facing": "right",
+      "height": 0.36,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.96875
+      },
+      "poses": {
+        "idle": "characters/female-idle.png",
+        "run": "characters/female-run.png",
+        "attack": "characters/female-attack.png"
+      }
+    }
+  },
+  "enemies": {
+    "inkSlime": {
+      "src": "enemies/ink-slime.png",
+      "label": "잉크 슬라임",
+      "height": 0.24,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9625
+      }
+    },
+    "falsePrecedentGhost": {
+      "src": "enemies/false-precedent-ghost.png",
+      "label": "판례 유령",
+      "height": 0.29,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9625
+      },
+      "floatY": 0.06
+    },
+    "prisonCage": {
+      "src": "enemies/prison-cage.png",
+      "label": "철창 몬스터",
+      "height": 0.34,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9625
+      }
+    },
+    "hourglassGoblin": {
+      "src": "enemies/hourglass-goblin.png",
+      "label": "모래시계 도깨비",
+      "height": 0.28,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9625
+      }
+    },
+    "statuteMimic": {
+      "src": "enemies/statute-mimic.png",
+      "label": "법전 미믹",
+      "height": 0.27,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9625
+      },
+      "floatY": 0.07
+    },
+    "inkBoss": {
+      "src": "enemies/ink-boss.png",
+      "label": "잉크 보스",
+      "height": 0.41,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.9625
+      }
+    }
+  },
+  "npcs": {
+    "instructor": {
+      "src": "npcs/instructor.png",
+      "label": "형사법 강사",
+      "height": 0.34,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.96875
+      }
+    },
+    "bookseller": {
+      "src": "npcs/bookseller.png",
+      "label": "서점 주인",
+      "height": 0.34,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.96875
+      }
+    },
+    "studyPartner": {
+      "src": "npcs/study-partner.png",
+      "label": "스터디 동료",
+      "height": 0.34,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.96875
+      }
+    }
+  }
+}

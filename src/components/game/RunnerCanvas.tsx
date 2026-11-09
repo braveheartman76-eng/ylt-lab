@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { themeOf, isBossStage } from '@/game/world'
+import { themeOf, isBossStage, enemyKeyFor } from '@/game/world'
+import { loadHunterAssets, type HunterAssets, type HeroKey, type GateArt } from '@/game/assets'
 
 export type RunPhase = 'idle' | 'running' | 'question' | 'feedback'
 
@@ -24,6 +25,7 @@ interface Props {
   critical?: boolean // 미처리 오답 문항 = 불시 공격(붉은 경고 연출)
   /** 대제목/소제목 푯말. gate=true 면 달리는 중 문(아치)이 다가와 캐릭터가 통과한다(소제목이 바뀔 때). */
   sign?: { section: string; topic: string | null; gate: boolean } | null
+  hero?: HeroKey // 남/여 헌터(그림 자료가 있을 때)
 }
 
 const W = 360
@@ -44,6 +46,7 @@ export default function RunnerCanvas(p: Props) {
   const cv = useRef<HTMLCanvasElement>(null)
   const props = useRef(p)
   useEffect(() => { props.current = p })
+  const assetsRef = useRef<HunterAssets | null>(null) // 사용자 제작 그림. 불러오기 전/실패 시 null → 도형 그림
 
   const world = useRef<World>({
     scroll: 0, t: 0, runT: 0, arrived: false, lastPhase: '',
@@ -59,6 +62,8 @@ export default function RunnerCanvas(p: Props) {
     canvas.height = H * dpr
     ctx.scale(dpr, dpr)
     let raf = 0
+    let alive = true
+    loadHunterAssets().then(a => { if (alive) assetsRef.current = a })
     let last = performance.now()
     const w = world.current
 
@@ -130,11 +135,12 @@ export default function RunnerCanvas(p: Props) {
       w.pops.forEach(q => { q.t += dt; q.y -= 24 * dt })
       w.pops = w.pops.filter(q => q.t < 1.1)
 
-      draw(ctx, pr, w)
+      draw(ctx, pr, w, assetsRef.current)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
     return () => {
+      alive = false
       cancelAnimationFrame(raf)
       window.removeEventListener('pointerdown', onPointer)
       window.removeEventListener('keydown', onKey)
@@ -150,29 +156,41 @@ export default function RunnerCanvas(p: Props) {
   )
 }
 
-function draw(ctx: CanvasRenderingContext2D, p: Props, w: World) {
+function draw(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets | null) {
   const th = themeOf(p.stage)
   const sx = w.shake > 0 ? Math.sin(w.t * 90) * 3 * w.shake : 0
   ctx.save()
   ctx.translate(sx, 0)
-  const g = ctx.createLinearGradient(0, 0, 0, GROUND)
-  g.addColorStop(0, th.sky[0]); g.addColorStop(1, th.sky[1])
-  ctx.fillStyle = g; ctx.fillRect(-10, 0, W + 20, H)
-  // 원경(건물 실루엣) 시차 스크롤
-  ctx.fillStyle = 'rgba(0,0,0,0.07)'
-  for (let i = -1; i < 8; i++) {
-    const x = ((i * 70 - (w.scroll * 0.25) % 70) + 70) % (W + 70) - 35
-    const hh = 40 + ((i * 37) % 5) * 12
-    ctx.fillRect(x, GROUND - hh - 20, 46, hh + 20)
+  const bgArt = A?.bg[th.bg]
+  if (bgArt) {
+    // 사용자 제작 배경(1104×674 → 캔버스와 같은 비율). 정지 그림이라 달리는 느낌은 도로 위 흐르는 점선으로 준다.
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(bgArt.img, -6, 0, W + 12, H)
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'
+    for (let i = 0; i < 12; i++) { const x = ((i * 44 - (w.scroll % 44)) + 528) % 528 - 44; ctx.fillRect(x, H - 22, 24, 3) }
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, GROUND)
+    g.addColorStop(0, th.sky[0]); g.addColorStop(1, th.sky[1])
+    ctx.fillStyle = g; ctx.fillRect(-10, 0, W + 20, H)
+    // 원경(건물 실루엣) 시차 스크롤
+    ctx.fillStyle = 'rgba(0,0,0,0.07)'
+    for (let i = -1; i < 8; i++) {
+      const x = ((i * 70 - (w.scroll * 0.25) % 70) + 70) % (W + 70) - 35
+      const hh = 40 + ((i * 37) % 5) * 12
+      ctx.fillRect(x, GROUND - hh - 20, 46, hh + 20)
+    }
+    // 바닥
+    ctx.fillStyle = th.ground; ctx.fillRect(-10, GROUND, W + 20, H - GROUND)
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'
+    for (let i = 0; i < 12; i++) { const x = ((i * 40 - (w.scroll % 40)) + 480) % 480 - 40; ctx.fillRect(x, GROUND + 14, 22, 3) }
   }
-  // 바닥
-  ctx.fillStyle = th.ground; ctx.fillRect(-10, GROUND, W + 20, H - GROUND)
-  ctx.fillStyle = 'rgba(255,255,255,0.35)'
-  for (let i = 0; i < 12; i++) { const x = ((i * 40 - (w.scroll % 40)) + 480) % 480 - 40; ctx.fillRect(x, GROUND + 14, 22, 3) }
   // 소제목 문(아치): 달리는 동안 오른쪽에서 다가와 캐릭터 머리 위로 지나간다(플레이어보다 뒤에 그림)
   if (p.sign?.gate && p.phase === 'running') {
     const prog = Math.min(1, w.runT / p.runMs)
-    drawGate(ctx, W + 80 - prog * (W + 200), p.sign)
+    const art = p.sign.topic ? A?.gates.byTitle.get(p.sign.topic) : undefined
+    const gx = W + 90 - prog * (W + 220)
+    if (art && A) drawArtGate(ctx, gx, art, A.gates.displayHeight)
+    else drawGate(ctx, gx, p.sign)
   }
   // 장애물(택배 상자) · 코인
   w.obs.forEach(o => {
@@ -184,10 +202,12 @@ function draw(ctx: CanvasRenderingContext2D, p: Props, w: World) {
   })
   w.coins.forEach(c => { if (!c.got) { ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(c.x, c.y, 6, 0, 7); ctx.fill(); ctx.strokeStyle = '#a16207'; ctx.stroke() } })
   // 몬스터
-  drawMonster(ctx, 270, GROUND, p, w)
+  if (A) drawEnemyArt(ctx, 270, GROUND, p, w, A)
+  else drawMonster(ctx, 270, GROUND, p, w)
   // 플레이어
   const lunge = w.atk > 0 ? Math.sin((1 - w.atk) * Math.PI) * 60 : 0
-  drawPlayer(ctx, 70 + lunge - w.knock * 16, GROUND - w.py, p.phase === 'running', w)
+  if (A) drawHeroArt(ctx, 70 + lunge - w.knock * 16, GROUND - w.py, p, w, A)
+  else drawPlayer(ctx, 70 + lunge - w.knock * 16, GROUND - w.py, p.phase === 'running', w)
   // 슬래시
   if (w.atk > 0.2) {
     ctx.strokeStyle = w.crit ? `rgba(251,146,60,${w.atk})` : `rgba(255,255,255,${w.atk})`; ctx.lineWidth = w.crit ? 10 : 5
@@ -203,7 +223,7 @@ function draw(ctx: CanvasRenderingContext2D, p: Props, w: World) {
   for (let i = 0; i < 3; i++) { ctx.fillStyle = i < p.playerHp ? '#ef4444' : 'rgba(0,0,0,0.25)'; ctx.fillText('♥', 130 + i * 16, 24) }
   if (p.phase === 'running') { ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(W - 138, 8, 130, 20); ctx.fillStyle = '#fff'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('화면 터치 = 점프!', W - 73, 22) }
   // 푯말(고정): 지금 풀고 있는 대제목 / 소제목
-  if (p.sign && p.phase !== 'idle') drawPlate(ctx, p.sign)
+  if (p.sign && p.phase !== 'idle' && !(p.sign.gate && p.phase === 'running')) drawPlate(ctx, p.sign)
   if (p.critical && (p.phase === 'running' || p.phase === 'question')) {
     // 불시 공격: 붉은 테두리가 깜빡이고 경고 문구 표시
     const a = 0.25 + 0.2 * Math.sin(w.t * 8)
@@ -246,6 +266,59 @@ function drawGate(ctx: CanvasRenderingContext2D, cx: number, sign: { section: st
   ctx.fillText(fit(ctx, sign.section, bw - 12, 9, false), cx, top + 13)
   if (sign.topic) { ctx.fillStyle = '#fff'; ctx.fillText(fit(ctx, '▸ ' + sign.topic, bw - 12, 12, true), cx, top + 29) }
   ctx.textAlign = 'left'
+}
+
+/** 사용자 제작 문 그림 + 간판 글자(gate-manifest 의 labelBox/labelLines 규칙). */
+function drawArtGate(ctx: CanvasRenderingContext2D, cx: number, g: GateArt, displayHeight: number) {
+  const h = H * displayHeight
+  const wd = h * g.img.naturalWidth / g.img.naturalHeight
+  const x = cx - wd * g.anchor.x, y = GROUND - h * g.anchor.y
+  ctx.drawImage(g.img, x, y, wd, h)
+  const b = g.labelBox
+  const lx = x + wd * (b.x + b.width / 2), ly = y + h * (b.y + b.height / 2)
+  const maxW = wd * b.width, maxH = h * b.height
+  let size = Math.min(21, maxH / (g.labelLines.length * 1.16))
+  const font = (s: number) => `800 ${s}px "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif`
+  ctx.save()
+  ctx.font = font(size)
+  const widest = Math.max(...g.labelLines.map(l => ctx.measureText(l).width))
+  if (widest > maxW) { size *= maxW / widest; ctx.font = font(size) }
+  ctx.fillStyle = '#251c16'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  g.labelLines.forEach((line, i) => ctx.fillText(line, lx, ly + (i - (g.labelLines.length - 1) / 2) * size * 1.12))
+  ctx.restore()
+}
+
+function drawHeroArt(ctx: CanvasRenderingContext2D, x: number, y: number, p: Props, w: World, A: HunterAssets) {
+  const hero = A.hero[p.hero ?? 'male']
+  const pose = w.atk > 0.05 ? 'attack' : p.phase === 'running' ? 'run' : 'idle'
+  const img = hero.poses[pose]
+  const h = H * hero.height
+  const wd = h * img.naturalWidth / img.naturalHeight
+  const bob = p.phase === 'running' && w.py === 0 ? Math.abs(Math.sin(w.t * 12)) * 3 : 0
+  ctx.save()
+  if (w.hurt > 0 && Math.floor(w.t * 20) % 2 === 0) ctx.globalAlpha = 0.45
+  ctx.drawImage(img, x - wd * hero.anchor.x, y - bob - h * hero.anchor.y, wd, h)
+  ctx.restore()
+}
+
+function drawEnemyArt(ctx: CanvasRenderingContext2D, x: number, y: number, p: Props, w: World, A: HunterAssets) {
+  const e = A.enemies[enemyKeyFor(p.stage)]
+  if (!e) return drawMonster(ctx, x, y, p, w)
+  const h = H * e.height
+  const wd = h * e.img.naturalWidth / e.img.naturalHeight
+  const lunge = w.mLunge > 0 ? -Math.sin((1 - w.mLunge) * Math.PI) * 70 : 0
+  const float = (e.floatY ?? 0) * H + (e.floatY ? Math.sin(w.t * 3) * 3 : 0)
+  const shake = w.mHit > 0 ? Math.sin(w.t * 80) * 3 * w.mHit : 0
+  ctx.save()
+  if (p.monsterHp <= 0 && p.phase !== 'running') ctx.globalAlpha = 0.35
+  else if (w.mHit > 0 && Math.floor(w.t * 30) % 2 === 0) ctx.globalAlpha = 0.6
+  const top = y - float - h * e.anchor.y
+  ctx.drawImage(e.img, x + lunge + shake - wd * e.anchor.x, top, wd, h)
+  ctx.globalAlpha = 1
+  // HP 바
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x - 30, top - 12, 60, 8)
+  ctx.fillStyle = '#ef4444'; ctx.fillRect(x - 30, top - 12, 60 * Math.max(0, p.monsterHp) / p.monsterMax, 8)
+  ctx.restore()
 }
 
 function drawPlayer(ctx: CanvasRenderingContext2D, x: number, y: number, running: boolean, w: World) {

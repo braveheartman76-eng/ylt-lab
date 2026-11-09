@@ -207,12 +207,17 @@ export default function GameClient() {
         <section>
           <div className="relative">
             <RunnerCanvas phase={phase} stage={game.stage} monsterHp={monsterHp} monsterMax={STAGE_SIZE} playerHp={playerHp} flash={flash}
-              runMs={3800} onArrive={arrive} sign={current ? { section: current.q.section ?? current.q.unitTitle, topic: current.q.topic ?? null, gate } : null} critical={current?.kind === 'critical' && (phase === 'running' || phase === 'question')} />
+              runMs={3800} onArrive={arrive} hero={game.hero} sign={current ? { section: current.q.section ?? current.q.unitTitle, topic: current.q.topic ?? null, gate } : null} critical={current?.kind === 'critical' && (phase === 'running' || phase === 'question')} />
             {phase === 'idle' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-black/45 p-4 text-center text-white">
                 <div className="text-lg font-bold">노량진역에 도착했습니다</div>
                 <div className="text-xs">STAGE {game.stage} · {th.name}{isBossStage(game.stage) ? ' · 보스' : ''}</div>
                 {openCount > 0 && <div className="rounded bg-rose-600/90 px-3 py-1 text-xs font-bold">⚠ 미처리 오답 {openCount}개가 불시 공격으로 먼저 나옵니다</div>}
+                <div className="flex gap-2 text-xs">
+                  {(['male', 'female'] as const).map(hk => (
+                    <button key={hk} onClick={() => setGame(g => ({ ...g, hero: hk }))}
+                      className={`rounded-full px-3 py-1 font-bold ${game.hero === hk ? 'bg-yellow-400 text-black' : 'bg-white/20 text-white'}`}>{hk === 'male' ? '남자 헌터' : '여자 헌터'}</button>))}
+                </div>
                 {questions.length ? (
                   <button onClick={() => start({})} className="mt-1 rounded-full bg-yellow-400 px-6 py-3 text-base font-bold text-black">공부 시작</button>
                 ) : <div className="text-sm">문제 데이터가 없습니다 (public/game-data)</div>}

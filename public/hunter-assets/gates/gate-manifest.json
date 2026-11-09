@@ -1,0 +1,241 @@
+{
+  "chapter": "형사소송법의 법원 — 법률·규칙과 헌법",
+  "displayHeight": 0.64,
+  "gates": [
+    {
+      "id": "formal-substantive",
+      "title": "형식적·실질적 의미",
+      "labelLines": [
+        "형식적·실질적",
+        "의미"
+      ],
+      "questionRefs": [
+        "1",
+        "1-1"
+      ],
+      "src": "formal-substantive.png",
+      "anchor": {
+        "x": 0.492562,
+        "y": 0.982729
+      },
+      "labelBox": {
+        "x": 0.261157,
+        "y": 0.146805,
+        "width": 0.466116,
+        "height": 0.136442
+      },
+      "openingBox": {
+        "x": 0.287603,
+        "y": 0.355786,
+        "width": 0.409917,
+        "height": 0.626943
+      }
+    },
+    {
+      "id": "supreme-court-rules",
+      "title": "대법원규칙",
+      "labelLines": [
+        "대법원규칙"
+      ],
+      "questionRefs": [
+        "2",
+        "2-1"
+      ],
+      "src": "supreme-court-rules.png",
+      "anchor": {
+        "x": 0.500833,
+        "y": 0.982847
+      },
+      "labelBox": {
+        "x": 0.225,
+        "y": 0.15952,
+        "width": 0.545,
+        "height": 0.135506
+      },
+      "openingBox": {
+        "x": 0.278333,
+        "y": 0.363636,
+        "width": 0.445,
+        "height": 0.619211
+      }
+    },
+    {
+      "id": "internal-rules",
+      "title": "내부 규칙의 효력",
+      "labelLines": [
+        "내부 규칙의 효력"
+      ],
+      "questionRefs": [
+        "3",
+        "3-1"
+      ],
+      "src": "internal-rules.png",
+      "anchor": {
+        "x": 0.500835,
+        "y": 0.981584
+      },
+      "labelBox": {
+        "x": 0.278798,
+        "y": 0.086556,
+        "width": 0.465776,
+        "height": 0.156538
+      },
+      "openingBox": {
+        "x": 0.293823,
+        "y": 0.311234,
+        "width": 0.414023,
+        "height": 0.67035
+      }
+    },
+    {
+      "id": "substantive-statutes",
+      "title": "실질적 의미의 법률",
+      "labelLines": [
+        "실질적 의미의 법률"
+      ],
+      "questionRefs": [
+        "4",
+        "4-1",
+        "4-2"
+      ],
+      "src": "substantive-statutes.png",
+      "anchor": {
+        "x": 0.497496,
+        "y": 0.982548
+      },
+      "labelBox": {
+        "x": 0.230384,
+        "y": 0.151832,
+        "width": 0.539232,
+        "height": 0.13438
+      },
+      "openingBox": {
+        "x": 0.293823,
+        "y": 0.347295,
+        "width": 0.407346,
+        "height": 0.635253
+      }
+    },
+    {
+      "id": "constitution-source",
+      "title": "헌법의 법원성",
+      "labelLines": [
+        "헌법의 법원성"
+      ],
+      "questionRefs": [
+        "5"
+      ],
+      "src": "constitution-source.png",
+      "anchor": {
+        "x": 0.497273,
+        "y": 0.983278
+      },
+      "labelBox": {
+        "x": 0.176364,
+        "y": 0.219064,
+        "width": 0.647273,
+        "height": 0.09699
+      },
+      "openingBox": {
+        "x": 0.298182,
+        "y": 0.37291,
+        "width": 0.398182,
+        "height": 0.610368
+      }
+    },
+    {
+      "id": "constitution-liberty",
+      "title": "헌법 명시 — 신체의 자유",
+      "labelLines": [
+        "헌법 명시",
+        "신체의 자유"
+      ],
+      "questionRefs": [
+        "6",
+        "7",
+        "8",
+        "8-1"
+      ],
+      "src": "constitution-liberty.png",
+      "anchor": {
+        "x": 0.499107,
+        "y": 0.983051
+      },
+      "labelBox": {
+        "x": 0.167857,
+        "y": 0.20339,
+        "width": 0.666071,
+        "height": 0.113559
+      },
+      "openingBox": {
+        "x": 0.289286,
+        "y": 0.362712,
+        "width": 0.419643,
+        "height": 0.620339
+      }
+    },
+    {
+      "id": "constitution-trial",
+      "title": "헌법 명시 — 증거·재판·보상",
+      "labelLines": [
+        "헌법 명시",
+        "증거·재판·보상"
+      ],
+      "questionRefs": [
+        "9",
+        "9-1",
+        "10",
+        "11"
+      ],
+      "src": "constitution-trial.png",
+      "anchor": {
+        "x": 0.50089,
+        "y": 0.983974
+      },
+      "labelBox": {
+        "x": 0.16726,
+        "y": 0.225962,
+        "width": 0.66726,
+        "height": 0.097756
+      },
+      "openingBox": {
+        "x": 0.314947,
+        "y": 0.378205,
+        "width": 0.371886,
+        "height": 0.605769
+      }
+    },
+    {
+      "id": "constitution-unlisted",
+      "title": "헌법에 없는 제도",
+      "labelLines": [
+        "헌법에 없는 제도"
+      ],
+      "questionRefs": [
+        "12",
+        "12-1",
+        "12-2",
+        "13",
+        "14",
+        "15"
+      ],
+      "src": "constitution-unlisted.png",
+      "anchor": {
+        "x": 0.5,
+        "y": 0.983897
+      },
+      "labelBox": {
+        "x": 0.16696,
+        "y": 0.219002,
+        "width": 0.662566,
+        "height": 0.099839
+      },
+      "openingBox": {
+        "x": 0.311072,
+        "y": 0.371981,
+        "width": 0.377856,
+        "height": 0.611916
+      }
+    }
+  ]
+}
