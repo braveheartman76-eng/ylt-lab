@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { themeOf, isBossStage, enemyKeyFor, bossForm, TIERS } from '@/game/world'
-import { loadHunterAssets, loadProgManifest, peekImage, gateArtFor, type HunterAssets, type HeroKey, type GateArt, type ProgManifest } from '@/game/assets'
+import { loadHunterAssets, loadProgManifest, loadRunSets, peekImage, peekUrl, runKey, gateArtFor, type HunterAssets, type HeroKey, type GateArt, type ProgManifest, type RunSets } from '@/game/assets'
 import type { SfxName } from '@/game/sfx'
 import { smooth, tinted, dimOf, type Drawable } from '@/game/sprites'
 import {
@@ -27,6 +27,7 @@ interface Props {
   monsterHp: number
   monsterMax: number
   playerHp: number
+  maxHp?: number // 체력 칸 수(생명 보너스로 늘어남)
   flash: Flash | null
   runMs: number // 문제 지점까지 달리는 시간
   onArrive: () => void
@@ -37,6 +38,7 @@ interface Props {
   tier?: number // 성장 단계 1~5: 헌터 복장·무기·보스·보스 배경이 바뀐다
   pet?: string | null
   onSfx?: (name: SfxName) => void
+  onPickup?: () => void // 달리다 간식을 먹었을 때(점수)
 }
 
 const W = 360
@@ -49,7 +51,7 @@ const RUN_SPEED = 120
 type HeroS = 'idle' | 'charge' | 'attack' | 'hurt'
 type EnemyS = 'idle' | 'charge' | 'attack' | 'hit' | 'die'
 interface Pop { x: number; y: number; text: string; color: string; t: number }
-interface Coin { x: number; y: number; got: boolean }
+interface Snack { x: number; y: number; kind: number; got: boolean }
 interface Fx { kind: 'slash' | 'spark' | 'claw'; x: number; y: number; t0: number; dur: number; crit?: boolean }
 interface World {
   scroll: number; t: number; runT: number; arrived: boolean; lastPhase: RunPhase | ''; lastFlash: number; gatePlayed: boolean
@@ -57,7 +59,7 @@ interface World {
   enemy: { s: EnemyS; t0: number }
   dying: { stage: number; t0: number } | null
   shake: number; redFlash: number
-  coins: Coin[]; pops: Pop[]; fx: Fx[]
+  snacks: Snack[]; pops: Pop[]; fx: Fx[]
   queue: { at: number; fn: () => void }[]
   S: number // 기기 픽셀 / 논리 단위 (선명도)
 }
@@ -69,11 +71,12 @@ export default function RunnerCanvas(p: Props) {
   useEffect(() => { props.current = p })
   const progRef = useRef<ProgManifest | null>(null)
   const assetsRef = useRef<HunterAssets | null>(null)
+  const runRef = useRef<RunSets | null>(null) // 달리기 프레임(복장별 8장)
 
   const world = useRef<World>({
     scroll: 0, t: 0, runT: 0, arrived: false, lastPhase: '', lastFlash: -1, gatePlayed: false,
     hero: { s: 'idle', t0: 0, crit: false }, enemy: { s: 'idle', t0: 0 }, dying: null,
-    shake: 0, redFlash: 0, coins: [], pops: [], fx: [], queue: [], S: 2,
+    shake: 0, redFlash: 0, snacks: [], pops: [], fx: [], queue: [], S: 2,
   })
 
   useEffect(() => {
@@ -84,6 +87,7 @@ export default function RunnerCanvas(p: Props) {
     const w = world.current
     loadHunterAssets().then(a => { if (alive) assetsRef.current = a })
     loadProgManifest().then(m => { if (alive) progRef.current = m })
+    loadRunSets().then(r => { if (alive) runRef.current = r })
 
     // 선명도: 캔버스 안쪽 해상도를 '실제로 화면에 보이는 크기 × 기기 배율'에 맞춘다(PC에서 작은 캔버스를 늘려 보이면 흐려짐).
     const fit = () => {
@@ -111,7 +115,9 @@ export default function RunnerCanvas(p: Props) {
       if (w.lastPhase !== pr.phase) {
         if (pr.phase === 'running') {
           w.runT = 0; w.arrived = false; w.gatePlayed = false
-          w.coins = [0, 1, 2, 3].map(i => ({ x: W + 40 + i * 70, y: GROUND - 40, got: false }))
+          // 달리는 길에 간식 3개: 먹으면 점수(자동으로 먹는다)
+          const seed = Math.floor(w.t * 10) % 3
+          w.snacks = [0, 1, 2].map(i => ({ x: W + 50 + i * 95, y: GROUND - 38 - (i === 1 ? 14 : 0), kind: (i + seed) % 3, got: false }))
           w.hero = { s: 'idle', t0: w.t, crit: false }; w.enemy = { s: 'idle', t0: w.t }
         }
         if (pr.phase === 'question') { w.hero = { s: 'idle', t0: w.t, crit: false }; w.enemy = { s: 'idle', t0: w.t } }
@@ -157,9 +163,9 @@ export default function RunnerCanvas(p: Props) {
         w.runT += dt * 1000
         if (w.runT >= pr.runMs && !w.arrived) { w.arrived = true; pr.onArrive() }
         if (pr.sign?.gate && !w.gatePlayed && gateX(w.runT, pr.runMs) <= PX) { w.gatePlayed = true; pr.onSfx?.('gate') }
-        w.coins.forEach(c => {
+        w.snacks.forEach(c => {
           c.x -= RUN_SPEED * dt
-          if (!c.got && c.x < PX + 6) { c.got = true; w.pops.push({ x: PX + 8, y: GROUND - 64, text: '+1', color: '#ca8a04', t: 0 }); pr.onSfx?.('coin') }
+          if (!c.got && c.x < PX + 8) { c.got = true; w.pops.push({ x: PX + 10, y: GROUND - 70, text: '냠 +1', color: '#d97706', t: 0 }); pr.onSfx?.('eat'); pr.onPickup?.() }
         })
       }
       w.shake = Math.max(0, w.shake - dt * 3)
@@ -169,7 +175,7 @@ export default function RunnerCanvas(p: Props) {
       w.fx = w.fx.filter(f => w.t - f.t0 < f.dur)
 
       fit()
-      draw(ctx, pr, w, assetsRef.current, progRef.current)
+      draw(ctx, pr, w, assetsRef.current, progRef.current, runRef.current)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -188,7 +194,7 @@ export default function RunnerCanvas(p: Props) {
 /** 문(아치)의 화면 x: 달리는 동안 오른쪽에서 다가와 헌터 위를 지나 왼쪽으로 빠진다 */
 const gateX = (runT: number, runMs: number) => W + 90 - clamp01(runT / runMs) * (W + 220)
 
-function draw(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets | null, P: ProgManifest | null) {
+function draw(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets | null, P: ProgManifest | null, R: RunSets | null) {
   ctx.setTransform(w.S, 0, 0, w.S, 0, 0)
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
@@ -224,8 +230,8 @@ function draw(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets
     if (art && A) drawArtGate(ctx, gateX(w.runT, p.runMs), art, A.gates.displayHeight, w.S)
     else drawGate(ctx, gateX(w.runT, p.runMs), p.sign)
   }
-  // 코인
-  w.coins.forEach(c => { if (!c.got) { ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(c.x, c.y, 6, 0, 7); ctx.fill(); ctx.strokeStyle = '#a16207'; ctx.stroke() } })
+  // 간식(먹으면 점수)
+  w.snacks.forEach(c => { if (!c.got) drawSnack(ctx, c.x, c.y + Math.sin(w.t * 5 + c.x * 0.05) * 2, c.kind) })
 
   // 악당(죽는 중이면 쓰러지는 몬스터 + 다음 몬스터가 서서히 등장)
   const resolving = p.phase === 'resolving'
@@ -237,7 +243,7 @@ function draw(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets
   } else drawEnemy(ctx, p, w, A, P, { stage: p.stage, hp: p.monsterHp })
 
   // 헌터(+펫+무기)
-  drawHero(ctx, p, w, A, P, tier)
+  drawHero(ctx, p, w, A, P, R, tier)
 
   // 효과: 베기 / 타격 불꽃 / 악당 발톱
   w.fx.forEach(f => drawFx(ctx, f, w.t))
@@ -257,7 +263,7 @@ function draw(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets
   ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(8, 8, 108, 22)
   ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left'
   ctx.fillText(`STAGE ${p.stage} · ${th.name}`.slice(0, 14), 14, 23)
-  for (let i = 0; i < 3; i++) { ctx.fillStyle = i < p.playerHp ? '#ef4444' : 'rgba(0,0,0,0.25)'; ctx.fillText('♥', 130 + i * 16, 24) }
+  for (let i = 0; i < (p.maxHp ?? 3); i++) { ctx.fillStyle = i < p.playerHp ? '#ef4444' : 'rgba(0,0,0,0.25)'; ctx.fillText('♥', 130 + i * 15, 24) }
   if (p.sign && p.phase !== 'idle' && !(p.sign.gate && p.phase === 'running')) drawPlate(ctx, p.sign)
   if (p.critical && (p.phase === 'running' || p.phase === 'question' || p.phase === 'resolving')) {
     const a = 0.25 + 0.2 * Math.sin(w.t * 8)
@@ -321,7 +327,7 @@ function drawRunBody(ctx: CanvasRenderingContext2D, d: Drawable, wd: number, h: 
   ctx.restore()
 }
 
-function drawHero(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets | null, P: ProgManifest | null, tier: (typeof TIERS)[number]) {
+function drawHero(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets | null, P: ProgManifest | null, R: RunSets | null, tier: (typeof TIERS)[number]) {
   const running = p.phase === 'running'
   const hs = w.hero.s
   const prog = clamp01((w.t - w.hero.t0) / (hs === 'attack' ? HERO_ATTACK_S : HERO_HURT_S))
@@ -340,6 +346,25 @@ function drawHero(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAs
   const x = PX + dx
 
   drawPet(ctx, x - 44, GROUND, p, w, P)
+
+  // 달리기: 사용자가 그린 8장 프레임을 순서대로 재생(복장별). 프레임이 불러와지기 전에는 아래 변형 방식으로 대체.
+  if (running && hs !== 'attack' && hs !== 'hurt' && hs !== 'charge' && R) {
+    const key = runKey(heroKey, tier.heroSet)
+    const urls = R.frames[key]
+    if (urls) {
+      urls.forEach(u => peekUrl(u)) // 8장 모두 미리 불러오기
+      const frame = peekUrl(urls[Math.floor((w.t * 1000) / R.frameMs) % urls.length])
+      if (frame) {
+        const h = H * (R.fit[key] ?? 0.37)
+        const wd = h * frame.naturalWidth / frame.naturalHeight
+        ctx.save()
+        ctx.translate(x, GROUND)
+        ctx.drawImage(smooth(frame, wd, h, w.S), -wd * R.anchor.x, -h * R.anchor.y, wd, h)
+        ctx.restore()
+        return
+      }
+    }
+  }
 
   // 정예/전설 헌터(그림이 불러와졌을 때) 또는 기본 헌터
   let img: HTMLImageElement | null = null
@@ -426,6 +451,25 @@ function drawEnemy(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterA
     ctx.fillStyle = '#ef4444'; ctx.fillRect(EX - bw / 2, top, bw * Math.max(0, o.hp) / p.monsterMax, 8)
     ctx.restore()
   }
+}
+
+// ───────────────────────── 간식(먹으면 점수): 사과 / 커피 / 주먹밥 — 임시 도형 그림(나중에 그림으로 교체)
+function drawSnack(ctx: CanvasRenderingContext2D, x: number, y: number, kind: number) {
+  ctx.save(); ctx.translate(x, y)
+  ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(0, 12, 8, 2.5, 0, 0, 7); ctx.fill()
+  if (kind === 0) { // 사과
+    ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 7); ctx.fill()
+    ctx.fillStyle = '#16a34a'; ctx.fillRect(-1, -11, 2, 5); ctx.beginPath(); ctx.ellipse(4, -9, 4, 2, -0.5, 0, 7); ctx.fill()
+  } else if (kind === 1) { // 커피
+    ctx.fillStyle = '#f5f5f4'; ctx.fillRect(-7, -6, 14, 14); ctx.fillStyle = '#92400e'; ctx.fillRect(-7, -6, 14, 5)
+    ctx.strokeStyle = '#f5f5f4'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(9, 1, 4, -1.4, 1.4); ctx.stroke()
+    ctx.strokeStyle = 'rgba(120,120,120,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-2, -9); ctx.quadraticCurveTo(-5, -13, -2, -16); ctx.stroke()
+  } else { // 주먹밥
+    ctx.fillStyle = '#fafafa'; ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(10, 8); ctx.lineTo(-10, 8); ctx.closePath(); ctx.fill()
+    ctx.strokeStyle = '#d4d4d8'; ctx.lineWidth = 1; ctx.stroke()
+    ctx.fillStyle = '#1f2937'; ctx.fillRect(-5, 1, 10, 7)
+  }
+  ctx.restore()
 }
 
 // ───────────────────────── 문 / 푯말

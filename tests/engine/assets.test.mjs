@@ -40,3 +40,22 @@ test('게임 캐릭터 이미지는 모두 같은 크기(포즈 전환 시 튀�
   }
   assert.equal(dims.size, 1)
 })
+
+test('달리기 프레임: 6벌 × 8장이 모두 존재하고 480×384, 표시 크기 보정값(run-fit)이 있다', () => {
+  const dir = ROOT + 'animation/run/'
+  const run = JSON.parse(readFileSync(dir + 'run-manifest.json', 'utf8'))
+  const fit = JSON.parse(readFileSync(dir + 'run-fit.json', 'utf8')).heightPct
+  const keys = ['male', 'female', 'male-veteran', 'female-veteran', 'male-legendary', 'female-legendary']
+  assert.deepEqual(Object.keys(run.sets).sort(), [...keys].sort())
+  for (const k of keys) {
+    const frames = run.sets[k]
+    assert.equal(frames.length, 8, k)
+    for (const url of frames) {
+      const f = dir + url.split('/').pop()
+      assert.ok(existsSync(f), f)
+      const b = readFileSync(f)
+      assert.equal(`${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`, '480x384', f)
+    }
+    assert.ok(fit[k] > 0.3 && fit[k] < 0.5, `${k} fit ${fit[k]}`)
+  }
+})

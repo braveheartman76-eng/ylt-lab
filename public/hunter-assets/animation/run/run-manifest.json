@@ -1,0 +1,74 @@
+{
+  "action": "run",
+  "facing": "right",
+  "frameWidth": 480,
+  "frameHeight": 384,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.96875
+  },
+  "previewFrameMs": 80,
+  "loop": true,
+  "sets": {
+    "male": [
+      "/hunter-assets/animation/run/male-run-1.png",
+      "/hunter-assets/animation/run/male-run-2.png",
+      "/hunter-assets/animation/run/male-run-3.png",
+      "/hunter-assets/animation/run/male-run-4.png",
+      "/hunter-assets/animation/run/male-run-5.png",
+      "/hunter-assets/animation/run/male-run-6.png",
+      "/hunter-assets/animation/run/male-run-7.png",
+      "/hunter-assets/animation/run/male-run-8.png"
+    ],
+    "female": [
+      "/hunter-assets/animation/run/female-run-1.png",
+      "/hunter-assets/animation/run/female-run-2.png",
+      "/hunter-assets/animation/run/female-run-3.png",
+      "/hunter-assets/animation/run/female-run-4.png",
+      "/hunter-assets/animation/run/female-run-5.png",
+      "/hunter-assets/animation/run/female-run-6.png",
+      "/hunter-assets/animation/run/female-run-7.png",
+      "/hunter-assets/animation/run/female-run-8.png"
+    ],
+    "male-veteran": [
+      "/hunter-assets/animation/run/male-veteran-run-1.png",
+      "/hunter-assets/animation/run/male-veteran-run-2.png",
+      "/hunter-assets/animation/run/male-veteran-run-3.png",
+      "/hunter-assets/animation/run/male-veteran-run-4.png",
+      "/hunter-assets/animation/run/male-veteran-run-5.png",
+      "/hunter-assets/animation/run/male-veteran-run-6.png",
+      "/hunter-assets/animation/run/male-veteran-run-7.png",
+      "/hunter-assets/animation/run/male-veteran-run-8.png"
+    ],
+    "female-veteran": [
+      "/hunter-assets/animation/run/female-veteran-run-1.png",
+      "/hunter-assets/animation/run/female-veteran-run-2.png",
+      "/hunter-assets/animation/run/female-veteran-run-3.png",
+      "/hunter-assets/animation/run/female-veteran-run-4.png",
+      "/hunter-assets/animation/run/female-veteran-run-5.png",
+      "/hunter-assets/animation/run/female-veteran-run-6.png",
+      "/hunter-assets/animation/run/female-veteran-run-7.png",
+      "/hunter-assets/animation/run/female-veteran-run-8.png"
+    ],
+    "male-legendary": [
+      "/hunter-assets/animation/run/male-legendary-run-1.png",
+      "/hunter-assets/animation/run/male-legendary-run-2.png",
+      "/hunter-assets/animation/run/male-legendary-run-3.png",
+      "/hunter-assets/animation/run/male-legendary-run-4.png",
+      "/hunter-assets/animation/run/male-legendary-run-5.png",
+      "/hunter-assets/animation/run/male-legendary-run-6.png",
+      "/hunter-assets/animation/run/male-legendary-run-7.png",
+      "/hunter-assets/animation/run/male-legendary-run-8.png"
+    ],
+    "female-legendary": [
+      "/hunter-assets/animation/run/female-legendary-run-1.png",
+      "/hunter-assets/animation/run/female-legendary-run-2.png",
+      "/hunter-assets/animation/run/female-legendary-run-3.png",
+      "/hunter-assets/animation/run/female-legendary-run-4.png",
+      "/hunter-assets/animation/run/female-legendary-run-5.png",
+      "/hunter-assets/animation/run/female-legendary-run-6.png",
+      "/hunter-assets/animation/run/female-legendary-run-7.png",
+      "/hunter-assets/animation/run/female-legendary-run-8.png"
+    ]
+  }
+}

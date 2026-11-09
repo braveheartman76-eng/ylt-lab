@@ -2,7 +2,7 @@
 // unlockSfx()를 첫 터치(공부 시작 버튼)에서 호출한다. 설정은 configureSfx()로 전달(켜기/끄기, 볼륨, 배경음악).
 export type SfxName =
   | 'select' | 'tension' | 'attack' | 'correct' | 'critical' | 'enemyAttack' | 'hit' | 'wrong'
-  | 'coin' | 'gate' | 'ambush' | 'clear' | 'levelup'
+  | 'coin' | 'eat' | 'life' | 'gate' | 'ambush' | 'clear' | 'levelup'
 
 export interface SfxSettings { enabled: boolean; volume: number; bgm?: boolean }
 
@@ -136,6 +136,15 @@ export function playSfx(name: SfxName) {
     case 'coin': // 짧은 반짝
       tone(c, t, N(15), 0.07, 'square', 0.16)
       tone(c, t + 0.06, N(22), 0.14, 'square', 0.16)
+      break
+    case 'eat': // 간식 냠: 통통 튀는 두 번
+      tone(c, t, 520, 0.06, 'sine', 0.35, 760)
+      tone(c, t + 0.07, 640, 0.08, 'sine', 0.35, 980)
+      break
+    case 'life': // 생명 보너스: 1UP 느낌의 밝은 상승 + 반짝
+      ;[0, 4, 7, 12, 16, 19].forEach((s, i) => tone(c, t + i * 0.06, N(s), 0.14, 'square', 0.2))
+      tone(c, t + 0.42, N(24), 0.5, 'triangle', 0.4)
+      noise(c, t + 0.4, 0.3, 0.16, 9000, 4000, 'highpass')
       break
     case 'gate': // 문 통과: 웅장한 차임
       ;[0, 4, 7, 12].forEach((s, i) => tone(c, t + i * 0.08, N(s), 0.42, 'triangle', 0.3))

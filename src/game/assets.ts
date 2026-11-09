@@ -110,3 +110,37 @@ export function gateArtFor(g: HunterAssets['gates'], section: string, topic: str
   const tpl = pickTemplate(list, section)
   return { ...tpl, title: topic, labelLines: wrapTitle(topic) }
 }
+
+// ───────────────────────── 달리기 프레임(복장별 8장): public/hunter-assets/animation/run/
+export interface RunSets {
+  frames: Record<string, string[]> // 'male' | 'male-veteran' | 'male-legendary' | 'female' ... → 8장 절대경로
+  fit: Record<string, number> // 기준 포즈와 같은 캐릭터 크기로 보이게 하는 화면 높이 비율(run-fit.json, 자동 계산)
+  anchor: { x: number; y: number }
+  frameMs: number
+}
+
+export async function loadRunSets(): Promise<RunSets | null> {
+  try {
+    const m = await fetch(ROOT + 'animation/run/run-manifest.json').then(r => (r.ok ? r.json() : null))
+    if (!m?.sets) return null
+    const f = await fetch(ROOT + 'animation/run/run-fit.json').then(r => (r.ok ? r.json() : null)).catch(() => null)
+    return { frames: m.sets, fit: f?.heightPct ?? {}, anchor: m.anchor ?? { x: 0.5, y: 0.96875 }, frameMs: m.previewFrameMs ?? 80 }
+  } catch {
+    return null
+  }
+}
+
+const urlCache = new Map<string, HTMLImageElement | 'loading' | 'error'>()
+/** 절대 경로(예: '/hunter-assets/animation/run/male-run-1.png') 이미지를 불러온 만큼만 돌려준다. 아직이면 null. */
+export function peekUrl(url: string): HTMLImageElement | null {
+  const hit = urlCache.get(url)
+  if (hit && hit !== 'loading' && hit !== 'error') return hit
+  if (!hit) {
+    urlCache.set(url, 'loading')
+    load(url).then(img => urlCache.set(url, img), () => urlCache.set(url, 'error'))
+  }
+  return null
+}
+
+/** 복장 키: 입문 = 'male', 정예 = 'male-veteran', 전설 = 'male-legendary' */
+export const runKey = (hero: HeroKey, heroSet: 'starter' | 'veteran' | 'legendary') => (heroSet === 'starter' ? hero : `${hero}-${heroSet}`)

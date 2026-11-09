@@ -23,7 +23,7 @@ test('window 가 없는 환경(서버/테스트)에서는 아무 일도 하지 �
 test('모든 효과음이 실제로 소리 재료를 만들고, 꺼짐/볼륨 0 이면 조용하며, 볼륨이 범위로 제한된다', async () => {
   globalThis.window = { AudioContext: FakeAC }
   const { playSfx, unlockSfx, configureSfx } = await import('../../src/game/sfx.ts?fresh=1')
-  const names = ['select', 'tension', 'attack', 'correct', 'critical', 'enemyAttack', 'hit', 'wrong', 'coin', 'gate', 'ambush', 'clear', 'levelup']
+  const names = ['select', 'tension', 'attack', 'correct', 'critical', 'enemyAttack', 'hit', 'wrong', 'coin', 'eat', 'life', 'gate', 'ambush', 'clear', 'levelup']
   configureSfx({ enabled: true, volume: 0.6 })
   unlockSfx()
   assert.equal(FakeAC.last.state, 'running', '첫 터치에서 오디오 잠금 해제(resume)')

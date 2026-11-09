@@ -44,6 +44,6 @@ export function stopSpeaking() {
 
 /** 보기 좋은 기호를 읽기 좋게: 선지 번호/○× 등 */
 export function readable(text: string) {
-  return text.replace(/㉠/g, '가').replace(/㉡/g, '나').replace(/㉢/g, '다').replace(/㉣/g, '라').replace(/㉤/g, '마')
+  return text.replace(/○/g, '맞음').replace(/×/g, '틀림').replace(/㉠/g, '가').replace(/㉡/g, '나').replace(/㉢/g, '다').replace(/㉣/g, '라').replace(/㉤/g, '마')
     .replace(/ㄱ\./g, '가.').replace(/ㄴ\./g, '나.').replace(/ㄷ\./g, '다.').replace(/ㄹ\./g, '라.')
 }

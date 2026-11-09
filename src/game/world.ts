@@ -20,7 +20,7 @@ export const THEMES: Theme[] = [
 export const STAGE_SIZE = 5 // 일반 스테이지에서 몬스터를 쓰러뜨리는 정답 수
 export const BOSS_HP = 8 // 보스 스테이지는 더 오래 싸운다(크리티컬은 2배 피해)
 export const stageHp = (stage: number) => (isBossStage(stage) ? BOSS_HP : STAGE_SIZE)
-export const MAX_PLAYER_HP = 3
+export const MAX_PLAYER_HP = 3 // 기본 체력(체력이 0이 되면 이 값으로 재정비)
 export const themeOf = (stage: number) => THEMES[(stage - 1) % THEMES.length]
 export const isBossStage = (stage: number) => stage % 5 === 0
 
@@ -113,3 +113,29 @@ export function roomName(itemCount: number) {
   if (itemCount >= 3) return '학원 자습실'
   return '허름한 고시원 방'
 }
+
+// ───────────────────────── 점수 → 생명 보너스
+// 간식을 먹거나 악당을 처치하면 점수가 쌓이고, 일정 점수마다 생명(체력) +1. 체력이 가득이면 코인으로 대신 준다.
+// 점수·생명은 게임 재미 요소이며 학습 보상(XP/코인 규칙)과 별개다. 체력이 0이 되어도 게임오버 없이 재정비(오답은 모두 기록).
+export const MAX_HP = 5
+export const SCORE_PICKUP = 1 // 간식 하나
+export const SCORE_KILL = 15 // 악당 처치
+export const SCORE_BOSS_KILL = 40 // 보스 처치
+export const SCORE_PER_LIFE = 40 // 이 점수마다 생명 +1
+export const FULL_HP_COIN_BONUS = 5
+
+export interface ScoreState { score: number; lifeAwards: number; hp: number; coins: number }
+export interface ScoreResult extends ScoreState { lives: number; coinBonus: number }
+
+export function addScore(s: ScoreState, pts: number): ScoreResult {
+  const score = s.score + Math.max(0, pts)
+  const earned = Math.max(0, Math.floor(score / SCORE_PER_LIFE) - s.lifeAwards)
+  let hp = s.hp, lives = 0, coinBonus = 0
+  for (let i = 0; i < earned; i++) {
+    if (hp < MAX_HP) { hp++; lives++ } else coinBonus += FULL_HP_COIN_BONUS
+  }
+  return { score, lifeAwards: s.lifeAwards + earned, hp, coins: s.coins + coinBonus, lives, coinBonus }
+}
+
+/** 다음 생명까지 남은 점수 */
+export const toNextLife = (score: number) => SCORE_PER_LIFE - (score % SCORE_PER_LIFE)
