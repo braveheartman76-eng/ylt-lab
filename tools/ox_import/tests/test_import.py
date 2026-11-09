@@ -98,7 +98,7 @@ class ImportTest(unittest.TestCase):
         with zipfile.ZipFile(f, "w") as z:
             z.writestr("Contents/section0.xml", sec)
         paras = ox_import.read_paragraphs(f)
-        self.assertEqual(paras[0].text, "① 가 ② 나")
+        self.assertEqual(paras[0].text, "① 가\t② 나")  # 탭은 구분자로 보존(필요하면 호출 쪽에서 공백으로 정규화)
 
     def test_pdf_not_silently_faked(self):
         with self.assertRaises(NotImplementedError):

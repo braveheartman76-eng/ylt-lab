@@ -234,3 +234,27 @@ test('reimport as version 2 (e.g. PDF -> HWPX): identity kept, history points at
   assert.equal(at.version_no, 1)
   assert.equal(await countQ(), before, '재가져오기가 문항을 중복 생성하지 않음')
 })
+
+// ───────── OX 문제집(대제목/소제목/출제 정보) ─────────
+test('ox book import: unit tree, sources(unverified), raw markers, law date, scoped numbers', async () => {
+  const db = await setup()
+  await db.exec(execFileSync('python3', ['-I', 'tools/ox_import/tests/make_ox_book_seed.py'], { encoding: 'utf8' }))
+  await db.exec(`UPDATE game_questions SET review_status='approved' WHERE source_book LIKE 'TEST-OX%'`)
+  // 단원 트리: 대제목(1) > 소제목(2)
+  const u = (await db.query(`SELECT level, count(*)::int n FROM game_units WHERE title LIKE '[테스트] 가상%' GROUP BY 1 ORDER BY 1`)).rows
+  assert.deepEqual(u, [{ level: 1, n: 2 }, { level: 2, n: 2 }])
+  // 번호 '1' 이 서로 다른 대제목에 있어도 둘 다 존재
+  const ones = (await db.query(`SELECT count(*)::int n FROM game_questions WHERE source_book LIKE 'TEST-OX%' AND source_no='1'`)).rows[0].n
+  assert.equal(ones, 2)
+  // 출제 정보는 미검증 출처로만 저장, 출제빈도는 미확인
+  const src = (await db.query(`SELECT count(*)::int n, bool_or(is_verified) v FROM game_question_sources s JOIN game_questions q ON q.id=s.question_id WHERE q.source_book LIKE 'TEST-OX%'`)).rows[0]
+  assert.deepEqual(src, { n: 5, v: false })
+  assert.equal((await db.query(`SELECT count(*)::int n FROM game_question_metadata m JOIN game_questions q ON q.id=m.question_id WHERE q.source_book LIKE 'TEST-OX%' AND (m.exam_frequency IS NOT NULL OR m.exam_frequency_status<>'unverified')`)).rows[0].n, 0)
+  // 기호 원문 보존(의미 null), 개정 반영 날짜는 주석에서만
+  const mk = (await db.query(`SELECT v.raw_markers m, v.law_basis_date::text d FROM game_questions q JOIN game_question_versions v ON v.id=q.current_version_id WHERE q.source_book LIKE 'TEST-OX%' AND q.source_no='1' ORDER BY q.source_book`)).rows
+  assert.ok(mk.every(r => r.m[0].meaning === null && r.d === null))
+  assert.equal((await db.query(`SELECT v.law_basis_date::text d FROM game_questions q JOIN game_question_versions v ON v.id=q.current_version_id WHERE q.source_book LIKE 'TEST-OX%' AND q.source_no='2'`)).rows[0].d, '2026-08-04')
+  // 채점은 OX 규칙 그대로
+  const id = (await db.query(`SELECT id FROM game_questions WHERE source_book LIKE 'TEST-OX%' AND source_no='1-1'`)).rows[0].id
+  assert.equal((await submit(db, id, 'X')).is_correct, true)
+})

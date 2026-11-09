@@ -19,6 +19,13 @@ export interface GameQuestion {
   isTestData?: boolean
   /** OX 변형 문항이면 원 문항 id */
   derivedFrom?: string | null
+  /** 문(푯말)에 표시: 대제목 / 소제목 (OX 문제집 형식) */
+  section?: string | null
+  topic?: string | null
+  /** 출제 정보 원문 (예: '19년 일경2차 / 23년 경승'). 출제빈도로 계산하지 않는다. */
+  sourceNote?: string | null
+  /** 문제 옆 기호 원문(Ⓐ/Ⓑ/Ⓒ). 의미는 해석하지 않는다. */
+  marker?: string | null
 }
 
 /** 학생 x 문항 복습 상태 (DB: game_review_schedules 와 동일 의미) */

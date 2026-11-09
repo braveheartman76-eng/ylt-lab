@@ -28,14 +28,14 @@ def expl_mcq(r):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("jsonl", type=Path)
+    ap.add_argument("jsonl", type=Path, nargs="+", help="변환 결과 questions.jsonl (여러 개를 합쳐서 내보낼 수 있음)")
     ap.add_argument("--unit", help="단원명 지정(미지정이면 jsonl 의 unit/book 값을 회차별로 사용)")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--test-data", action="store_true")
     a = ap.parse_args()
     h8 = lambda t: hashlib.sha1(t.encode("utf-8")).hexdigest()[:8]  # 실행마다 같은 ID(학습 기록 유지)
     out, skipped = [], 0
-    rows = [json.loads(l) for l in a.jsonl.read_text(encoding="utf-8").splitlines()]
+    rows = [json.loads(l) for f in a.jsonl for l in f.read_text(encoding="utf-8").splitlines()]
     key = lambda r: h8(r.get("book", ""))  # 회차(교재명)별 접두 — 회차 간 문항 번호 충돌 방지
     unit_of = lambda r: a.unit or r.get("unit") or r.get("book") or "미분류"
     ok_mcq = {(key(r), f"{r['no']:02d}") for r in rows if r["type"] == "mcq" and r.get("verdict_ok")}
@@ -49,6 +49,16 @@ def main():
                 stemNote=r.get("stem_note"), bogi=[dict(label=b["label"], text=b["text"]) for b in r["bogi"]] or None,
                 choices=[dict(no=str(i + 1), text=c["text"]) for i, c in enumerate(r["choices"])],
                 answer=r["answer"], explanation=expl_mcq(r), isTestData=a.test_data))
+        elif r["type"] == "ox_book":
+            # OX 문제집 문항: 대제목=단원(통계 단위), 소제목=푯말. 경고(개정 반영 주석 등)가 있으면 최종본이 아니므로 제외
+            if not r.get("answer") or r.get("warnings"):
+                skipped += 1
+                continue
+            sec = r["section"]
+            out.append(dict(
+                id=f"oxb-{h8(r.get('scope') or r['book'])}-{r['no']}", type="ox", unitId="u-" + h8(sec), unitTitle=sec,
+                section=sec, topic=r.get("topic"), statement=r["statement"], answer=r["answer"], explanation=r.get("explanation"),
+                sourceNote=" / ".join(r.get("source_exams") or []) or None, marker=r.get("marker"), isTestData=a.test_data))
         elif r["type"] == "ox_derived":
             if (key(r), r["derived_from_no"]) not in ok_mcq:
                 skipped += 1

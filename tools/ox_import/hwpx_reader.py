@@ -62,10 +62,11 @@ def read_hwpx(path: Path) -> list[Para]:
 
 def _t_text(t: ET.Element) -> str:
     """<hp:t> 의 텍스트. <hp:tab/> 같은 인라인 요소 '뒤에 이어지는 글자(tail)'도 포함해야 한다.
-    예) <hp:t>① 가<hp:tab/>② 나</hp:t> → '① 가 ② 나'  (tail 을 버리면 ② 선지가 사라진다)"""
+    예) <hp:t>① 가<hp:tab/>② 나</hp:t> → '① 가\t② 나'  (tail 을 버리면 ② 선지가 사라진다)"""
     parts = [t.text or ""]
     for c in t:
-        parts.append(" " if _local(c.tag) in ("tab", "lineBreak") else "")
+        n = _local(c.tag)
+        parts.append("\t" if n == "tab" else " " if n == "lineBreak" else "")  # 탭은 '문제 ⇥ 출처' 같은 구분자로 쓰이므로 보존
         parts.append(c.tail or "")
     return "".join(parts)
 
@@ -80,7 +81,9 @@ def _direct_para_text(p: ET.Element) -> str:
                 continue
             if name == "t":
                 parts.append(_t_text(ch))
-            elif name in ("lineBreak", "tab"):
+            elif name == "tab":
+                parts.append("\t")
+            elif name == "lineBreak":
                 parts.append(" ")
             else:
                 walk(ch)

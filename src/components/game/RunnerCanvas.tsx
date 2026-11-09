@@ -22,16 +22,21 @@ interface Props {
   runMs: number // 문제 지점까지 달리는 시간
   onArrive: () => void
   critical?: boolean // 미처리 오답 문항 = 불시 공격(붉은 경고 연출)
+  /** 대제목/소제목 푯말. gate=true 면 달리는 중 문(아치)이 다가와 캐릭터가 통과한다(소제목이 바뀔 때). */
+  sign?: { section: string; topic: string | null; gate: boolean } | null
 }
 
 const W = 360
 const H = 220
 const GROUND = 168
+// 점프: 공중 약 0.8초, 장애물을 넘을 수 있는 터치 타이밍 허용폭 약 0.4초(모바일에서 반응할 수 있게 넉넉히)
+const JUMP_V = 6.5
+const GRAVITY = 16
 const RUN_SPEED = 120 // px/s (천천히: 모바일에서 반응할 시간 확보)
 const OBSTACLE_ENTER_S = 1 // 첫 장애물이 화면 오른쪽 끝에 나타나는 시각(달리기 시작 후)
 
 interface Pop { x: number; y: number; text: string; color: string; t: number }
-interface Obs { x: number; w: number; h: number; passed: boolean }
+interface Obs { x: number; w: number; h: number; passed: boolean; hit?: boolean; hitT?: number }
 interface Coin { x: number; y: number; got: boolean }
 
 /** 자동 이동 러닝 화면. 학습 로직과 분리된 순수 연출(캐릭터·몬스터는 임시 도안). 화면을 터치/스페이스로 점프. */
@@ -42,7 +47,7 @@ export default function RunnerCanvas(p: Props) {
 
   const world = useRef<World>({
     scroll: 0, t: 0, runT: 0, arrived: false, lastPhase: '',
-    py: 0, vy: 0, crit: false, stumble: 0, atk: 0, hurt: 0, mHit: 0, mLunge: 0, shake: 0,
+    py: 0, vy: 0, crit: false, knock: 0, stumble: 0, atk: 0, hurt: 0, mHit: 0, mLunge: 0, shake: 0,
     obs: [], coins: [], pops: [], lastFlash: -1,
   })
 
@@ -58,7 +63,7 @@ export default function RunnerCanvas(p: Props) {
     const w = world.current
 
     // 화면 아무 곳이나 터치하면 점프(엄지로 누르기 쉽게). 버튼·링크·탭 영역은 제외. 스페이스바도 지원.
-    const jump = () => { if (w.py === 0 && w.vy === 0 && props.current.phase === 'running') w.vy = 7.2 }
+    const jump = () => { if (w.py === 0 && w.vy === 0 && props.current.phase === 'running') w.vy = JUMP_V }
     const onPointer = (e: PointerEvent) => {
       const t = e.target as Element | null
       if (t?.closest('button, a, input, label, nav, [role="tab"]')) return
@@ -99,15 +104,24 @@ export default function RunnerCanvas(p: Props) {
         w.coins.forEach(c => { c.x -= speed * dt })
       }
       // 점프 물리
-      if (w.py > 0 || w.vy > 0) { w.py = Math.max(0, w.py + w.vy * 60 * dt); w.vy -= 24 * dt * 1.0; if (w.py === 0) w.vy = 0 }
+      if (w.py > 0 || w.vy > 0) { w.py = Math.max(0, w.py + w.vy * 60 * dt); w.vy -= GRAVITY * dt; if (w.py === 0) w.vy = 0 }
       // 충돌/코인
       const px = 70
       w.obs.forEach(o => {
-        if (!o.passed && o.x < px + 10 && o.x + o.w > px - 10) { if (w.py < o.h - 4) { w.stumble = 0.6; o.passed = true } }
-        if (o.x + o.w < px - 10) o.passed = true
+        if (o.hit) { o.hitT = (o.hitT ?? 0) + dt; return }
+        if (!o.passed && o.x < px + 8 && o.x + o.w > px - 8 && w.py < o.h - 4) {
+          // 부딪힘: 캐릭터가 뒤로 밀리고 깜빡이며 상자가 튕겨 나간다(학습 기록·보상에는 영향 없음)
+          o.hit = true; o.hitT = 0; o.passed = true
+          w.stumble = 0.8; w.knock = 1; w.hurt = 1
+          w.pops.push({ x: px + 6, y: GROUND - 80, text: '쿵!', color: '#dc2626', t: 0 })
+        } else if (!o.passed && o.x + o.w < px - 10) {
+          o.passed = true // 점프로 무사히 넘음
+          w.pops.push({ x: px + 6, y: GROUND - 80, text: '점프 성공!', color: '#16a34a', t: 0 })
+        }
       })
       w.coins.forEach(c => { if (!c.got && Math.abs(c.x - px) < 12 && Math.abs((GROUND - c.y) - w.py - 14) < 28) { c.got = true; w.pops.push({ x: px + 8, y: GROUND - 70, text: '+1', color: '#ca8a04', t: 0 }) } })
       w.stumble = Math.max(0, w.stumble - dt)
+      w.knock = Math.max(0, w.knock - dt * 2.5)
       w.atk = Math.max(0, w.atk - dt * 2.2)
       w.hurt = Math.max(0, w.hurt - dt * 2)
       w.mHit = Math.max(0, w.mHit - dt * 3)
@@ -155,14 +169,25 @@ function draw(ctx: CanvasRenderingContext2D, p: Props, w: World) {
   ctx.fillStyle = th.ground; ctx.fillRect(-10, GROUND, W + 20, H - GROUND)
   ctx.fillStyle = 'rgba(255,255,255,0.35)'
   for (let i = 0; i < 12; i++) { const x = ((i * 40 - (w.scroll % 40)) + 480) % 480 - 40; ctx.fillRect(x, GROUND + 14, 22, 3) }
+  // 소제목 문(아치): 달리는 동안 오른쪽에서 다가와 캐릭터 머리 위로 지나간다(플레이어보다 뒤에 그림)
+  if (p.sign?.gate && p.phase === 'running') {
+    const prog = Math.min(1, w.runT / p.runMs)
+    drawGate(ctx, W + 80 - prog * (W + 200), p.sign)
+  }
   // 장애물(택배 상자) · 코인
-  w.obs.forEach(o => { ctx.fillStyle = '#b8864b'; ctx.fillRect(o.x, GROUND - o.h, o.w, o.h); ctx.fillStyle = '#8a6330'; ctx.fillRect(o.x + o.w / 2 - 1, GROUND - o.h, 2, o.h) })
+  w.obs.forEach(o => {
+    ctx.save()
+    if (o.hit) { const t = o.hitT ?? 0; ctx.translate(o.x + o.w / 2 + t * 110, GROUND - o.h / 2 - t * 90 + t * t * 260); ctx.rotate(t * 7); ctx.globalAlpha = Math.max(0, 1 - t * 1.2); ctx.translate(-o.w / 2, -o.h / 2) }
+    else ctx.translate(o.x, GROUND - o.h)
+    ctx.fillStyle = '#b8864b'; ctx.fillRect(0, 0, o.w, o.h); ctx.fillStyle = '#8a6330'; ctx.fillRect(o.w / 2 - 1, 0, 2, o.h)
+    ctx.restore()
+  })
   w.coins.forEach(c => { if (!c.got) { ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(c.x, c.y, 6, 0, 7); ctx.fill(); ctx.strokeStyle = '#a16207'; ctx.stroke() } })
   // 몬스터
   drawMonster(ctx, 270, GROUND, p, w)
   // 플레이어
   const lunge = w.atk > 0 ? Math.sin((1 - w.atk) * Math.PI) * 60 : 0
-  drawPlayer(ctx, 70 + lunge, GROUND - w.py, p.phase === 'running', w)
+  drawPlayer(ctx, 70 + lunge - w.knock * 16, GROUND - w.py, p.phase === 'running', w)
   // 슬래시
   if (w.atk > 0.2) {
     ctx.strokeStyle = w.crit ? `rgba(251,146,60,${w.atk})` : `rgba(255,255,255,${w.atk})`; ctx.lineWidth = w.crit ? 10 : 5
@@ -177,18 +202,50 @@ function draw(ctx: CanvasRenderingContext2D, p: Props, w: World) {
   ctx.fillText(`STAGE ${p.stage} · ${th.name}`.slice(0, 14), 14, 23)
   for (let i = 0; i < 3; i++) { ctx.fillStyle = i < p.playerHp ? '#ef4444' : 'rgba(0,0,0,0.25)'; ctx.fillText('♥', 130 + i * 16, 24) }
   if (p.phase === 'running') { ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(W - 138, 8, 130, 20); ctx.fillStyle = '#fff'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('화면 터치 = 점프!', W - 73, 22) }
+  // 푯말(고정): 지금 풀고 있는 대제목 / 소제목
+  if (p.sign && p.phase !== 'idle') drawPlate(ctx, p.sign)
   if (p.critical && (p.phase === 'running' || p.phase === 'question')) {
     // 불시 공격: 붉은 테두리가 깜빡이고 경고 문구 표시
     const a = 0.25 + 0.2 * Math.sin(w.t * 8)
     ctx.strokeStyle = `rgba(220,38,38,${a + 0.3})`; ctx.lineWidth = 8; ctx.strokeRect(4, 4, W - 8, H - 8); ctx.lineWidth = 1
-    ctx.fillStyle = 'rgba(220,38,38,0.9)'; ctx.fillRect(W / 2 - 62, 34, 124, 22)
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚠ 불시 공격!', W / 2, 50)
+    ctx.fillStyle = 'rgba(220,38,38,0.9)'; ctx.fillRect(W - 134, 34, 124, 22)
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚠ 불시 공격!', W - 72, 50)
   }
 }
 export type World = {
   scroll: number; t: number; runT: number; arrived: boolean; lastPhase: RunPhase | ''
-  py: number; vy: number; crit: boolean; stumble: number; atk: number; hurt: number; mHit: number; mLunge: number; shake: number
+  py: number; vy: number; crit: boolean; knock: number; stumble: number; atk: number; hurt: number; mHit: number; mLunge: number; shake: number
   obs: Obs[]; coins: Coin[]; pops: Pop[]; lastFlash: number
+}
+
+/** 글자를 maxW 안에 맞춘다: 글자 크기를 줄이다가 그래도 넘치면 말줄임. */
+function fit(ctx: CanvasRenderingContext2D, text: string, maxW: number, size: number, bold: boolean) {
+  let s = size
+  for (; s >= 8; s--) { ctx.font = `${bold ? 'bold ' : ''}${s}px sans-serif`; if (ctx.measureText(text).width <= maxW) return text }
+  let t = text
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1)
+  return t + '…'
+}
+
+function drawPlate(ctx: CanvasRenderingContext2D, sign: { section: string; topic: string | null }) {
+  const x = 8, y = 34, w = 168, h = sign.topic ? 36 : 22
+  ctx.fillStyle = 'rgba(92,58,30,0.92)'; ctx.fillRect(x, y, w, h)
+  ctx.strokeStyle = '#3b2412'; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
+  ctx.textAlign = 'left'; ctx.fillStyle = '#f5deb3'
+  ctx.fillText(fit(ctx, sign.section, w - 12, 9, false), x + 6, y + 13)
+  if (sign.topic) { ctx.fillStyle = '#fff'; ctx.fillText(fit(ctx, '▸ ' + sign.topic, w - 12, 12, true), x + 6, y + 29) }
+}
+
+function drawGate(ctx: CanvasRenderingContext2D, cx: number, sign: { section: string; topic: string | null }) {
+  const bw = 150, top = GROUND - 124, bh = sign.topic ? 36 : 24
+  // 기둥 2개 + 목재 간판. 캐릭터 머리(약 66px)보다 높게 달아서 아래로 지나간다.
+  ctx.fillStyle = '#7a5230'; ctx.fillRect(cx - bw / 2 + 6, top + bh, 8, GROUND - top - bh); ctx.fillRect(cx + bw / 2 - 14, top + bh, 8, GROUND - top - bh)
+  ctx.fillStyle = '#5c3a1e'; ctx.fillRect(cx - bw / 2, top, bw, bh)
+  ctx.strokeStyle = '#3b2412'; ctx.strokeRect(cx - bw / 2 + 0.5, top + 0.5, bw - 1, bh - 1)
+  ctx.textAlign = 'center'; ctx.fillStyle = '#f5deb3'
+  ctx.fillText(fit(ctx, sign.section, bw - 12, 9, false), cx, top + 13)
+  if (sign.topic) { ctx.fillStyle = '#fff'; ctx.fillText(fit(ctx, '▸ ' + sign.topic, bw - 12, 12, true), cx, top + 29) }
+  ctx.textAlign = 'left'
 }
 
 function drawPlayer(ctx: CanvasRenderingContext2D, x: number, y: number, running: boolean, w: World) {

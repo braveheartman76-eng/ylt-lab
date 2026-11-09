@@ -43,6 +43,8 @@ export default function GameClient() {
   const [startedAt, setStartedAt] = useState(0)
   const [now, setNow] = useState(() => Date.now())
   const [recent, setRecent] = useState<string[]>([])
+  const [lastTopic, setLastTopic] = useState('')
+  const [gate, setGate] = useState(false)
   const [served, setServed] = useState(0) // 이번 접속에서 출제한 수(처음 몇 문제는 미처리 오답을 먼저 낸다)
 
   // 저장된 진행 + 문제 데이터 불러오기 (로컬 모드)
@@ -79,10 +81,13 @@ export default function GameClient() {
     const p = pickNext(questions, game.schedules, { now: Date.now(), attempts: game.attempts, recentIds: recent, reviewOnly: ro, unitId: unit, forceCritical: sv < 3 })
     if (!p) { setCurrent(null); setPhase('idle'); return }
     setServed(sv + 1)
+    const key = `${p.question.section ?? p.question.unitTitle}|${p.question.topic ?? ''}`
+    setGate(key !== lastTopic) // 소제목이 바뀔 때만 문(푯말)이 나온다
+    setLastTopic(key)
     setCurrent({ q: p.question, kind: p.kind })
     setFeedback(null)
     setPhase('running')
-  }, [questions, game.schedules, game.attempts, recent, reviewOnly, focusUnit, served])
+  }, [questions, game.schedules, game.attempts, recent, reviewOnly, focusUnit, served, lastTopic])
 
   const arrive = useCallback(() => {
     setPhase('question')
@@ -202,7 +207,7 @@ export default function GameClient() {
         <section>
           <div className="relative">
             <RunnerCanvas phase={phase} stage={game.stage} monsterHp={monsterHp} monsterMax={STAGE_SIZE} playerHp={playerHp} flash={flash}
-              runMs={3800} onArrive={arrive} critical={current?.kind === 'critical' && (phase === 'running' || phase === 'question')} />
+              runMs={3800} onArrive={arrive} sign={current ? { section: current.q.section ?? current.q.unitTitle, topic: current.q.topic ?? null, gate } : null} critical={current?.kind === 'critical' && (phase === 'running' || phase === 'question')} />
             {phase === 'idle' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-black/45 p-4 text-center text-white">
                 <div className="text-lg font-bold">노량진역에 도착했습니다</div>
@@ -225,6 +230,7 @@ export default function GameClient() {
               {(phase === 'question' || phase === 'feedback') && (
                 <div>
                   <p className="whitespace-pre-wrap text-[15px] font-semibold leading-relaxed">{q!.statement}</p>
+                  {q!.sourceNote && <p className="mt-1 text-[11px] text-gray-400">출제 정보: {q!.sourceNote}</p>}
                   {q!.stemNote && <p className="mt-1 text-[11px] text-gray-400">{q!.stemNote.split('\n')[0]}</p>}
                   {q!.bogi && <ul className="mt-2 space-y-1 rounded-lg bg-gray-50 p-2 text-[13px]">{q!.bogi.map(b => <li key={b.label}><b>{b.label}</b> {b.text}</li>)}</ul>}
                   <div className={`mt-3 ${q!.type === 'ox' ? 'grid grid-cols-2 gap-3' : 'space-y-2'}`}>
