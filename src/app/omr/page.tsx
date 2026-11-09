@@ -2,48 +2,57 @@
 
 import { useMemo, useState } from 'react'
 
-const SUBJECTS = ['형법', '형사소송법'] as const
-type Subject = (typeof SUBJECTS)[number]
-
-const QUESTIONS = 80 // OMR 문항 수 (실제 문제 수는 80문제 미만)
-const COLUMNS = 4
-const ROWS = QUESTIONS / COLUMNS
-const CHOICES = ['①', '②', '③', '④']
-
 interface Sheet {
-  subject: Subject
+  id: string
+  label: string
+  kind: 'mcq' | 'ox'
+  questions: number
+  columns: number
+  choices: string[]
 }
 
-function OmrSheet({ subject }: Sheet) {
+// 인쇄 순서대로 정의 (형법/형소법은 4지선다 80문항, 교정학/형사정책은 OX 300문항)
+const SHEETS: Sheet[] = [
+  { id: 'criminal', label: '형법', kind: 'mcq', questions: 80, columns: 4, choices: ['①', '②', '③', '④'] },
+  { id: 'procedure', label: '형사소송법', kind: 'mcq', questions: 80, columns: 4, choices: ['①', '②', '③', '④'] },
+  { id: 'corrections', label: '교정학', kind: 'ox', questions: 300, columns: 6, choices: ['O', 'X'] },
+  { id: 'policy', label: '형사정책', kind: 'ox', questions: 300, columns: 6, choices: ['O', 'X'] },
+]
+
+function OmrSheet({ sheet }: { sheet: Sheet }) {
+  const { kind, questions, columns, choices, label } = sheet
+  const rows = questions / columns
   return (
-    <section className="omr-sheet">
+    <section className={`omr-sheet omr-${kind}`}>
       <header className="omr-title">
         <p className="omr-lab">이윤탁 형사법 연구실 · 모의고사 스터디</p>
         <h2>
-          {subject} 모의고사 제 <span className="omr-round" /> 회 답안지
+          {kind === 'mcq'
+            ? <>{label} 모의고사 제 <span className="omr-round" /> 회 답안지</>
+            : <>{label} OX 답안지 ({questions}문항)</>}
         </h2>
       </header>
 
       <div className="omr-info">
         <div><span>이름</span><i /></div>
-        <div><span>응시일</span><i /></div>
-        <div className="omr-info-score"><span>점수</span><i /> <b>/ {QUESTIONS}</b></div>
+        <div><span>{kind === 'mcq' ? '응시일' : '범위/회차'}</span><i /></div>
+        <div className="omr-info-score"><span>점수</span><i /> <b>/ {questions}</b></div>
       </div>
 
       <p className="omr-guide">
-        답안은 컴퓨터용 사인펜(또는 검정 볼펜)으로 보기 번호의 원을 완전히 칠하십시오.
+        답안은 컴퓨터용 사인펜(또는 검정 볼펜)으로 {kind === 'mcq' ? '보기 번호' : 'O/X'}의 원을 완전히 칠하십시오.
         수정할 때는 두 줄(=)을 긋고 다시 표기하십시오.
       </p>
 
-      <div className="omr-grid">
-        {Array.from({ length: COLUMNS }, (_, col) => (
+      <div className="omr-grid" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+        {Array.from({ length: columns }, (_, col) => (
           <div key={col} className="omr-col">
-            {Array.from({ length: ROWS }, (_, row) => {
-              const no = col * ROWS + row + 1
+            {Array.from({ length: rows }, (_, row) => {
+              const no = col * rows + row + 1
               return (
                 <div key={no} className="omr-row">
                   <span className="omr-no">{no}</span>
-                  {CHOICES.map((c) => (
+                  {choices.map((c) => (
                     <span key={c} className="omr-bubble">{c}</span>
                   ))}
                 </div>
@@ -54,18 +63,20 @@ function OmrSheet({ subject }: Sheet) {
       </div>
 
       <footer className="omr-foot">
-        ※ 문제 수가 80문항 미만인 회차는 남는 번호를 비워 두십시오.
+        {kind === 'mcq'
+          ? '※ 문제 수가 80문항 미만인 회차는 남는 번호를 비워 두십시오.'
+          : `※ 문항 수가 ${questions}문항 미만이면 남는 번호를 비워 두십시오.`}
       </footer>
     </section>
   )
 }
 
 export default function OmrPage() {
-  const [subject, setSubject] = useState<Subject | 'all'>('all')
+  const [selected, setSelected] = useState<string>('all')
 
-  const sheets = useMemo<Sheet[]>(
-    () => (subject === 'all' ? SUBJECTS : [subject]).map((s) => ({ subject: s })),
-    [subject],
+  const sheets = useMemo(
+    () => (selected === 'all' ? SHEETS : SHEETS.filter((x) => x.id === selected)),
+    [selected],
   )
 
   return (
@@ -75,19 +86,19 @@ export default function OmrPage() {
       <div className="omr-controls print:hidden">
         <h1 className="text-xl font-bold text-[#1a2a4a]">OMR 답안지</h1>
         <p className="text-sm text-gray-500 mt-1">
-          80문항 · 4지선다 · 형법 1장 + 형사소송법 1장. 회차는 인쇄 후 직접 적어 쓰고, 여러 장 복사해서 사용하세요.
+          형법·형사소송법(80문항 4지선다) 각 1장, 교정학·형사정책(300문항 OX) 각 1장. 회차는 인쇄 후 직접 적고, 필요한 만큼 복사해서 사용하세요.
         </p>
 
         <div className="flex flex-wrap items-center gap-3 mt-4">
           <label className="text-sm text-gray-600">
             과목{' '}
             <select
-              value={subject}
-              onChange={(e) => setSubject(e.target.value as Subject | 'all')}
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
               className="ml-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
             >
               <option value="all">전체</option>
-              {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+              {SHEETS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
             </select>
           </label>
           <button
@@ -103,7 +114,7 @@ export default function OmrPage() {
       </div>
 
       <div className="omr-sheets">
-        {sheets.map((s) => <OmrSheet key={s.subject} {...s} />)}
+        {sheets.map((x) => <OmrSheet key={x.id} sheet={x} />)}
       </div>
     </div>
   )
@@ -135,7 +146,7 @@ const css = `
 .omr-guide { font-size: 8pt; color: #444; margin: 4mm 0 3mm; line-height: 1.4; }
 
 .omr-grid {
-  display: grid; grid-template-columns: repeat(${COLUMNS}, 1fr); gap: 0;
+  display: grid; gap: 0;
   border: 1.5px solid #111; flex: 1; max-height: 196mm;
 }
 .omr-col { display: flex; flex-direction: column; justify-content: space-around; padding: 2mm 0; }
@@ -148,6 +159,13 @@ const css = `
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 7pt; line-height: 1; color: #111;
 }
+.omr-ox .omr-grid { max-height: 226mm; }
+.omr-ox .omr-col { padding: 1.5mm 0; }
+.omr-ox .omr-row { gap: 1.2mm; }
+.omr-ox .omr-row:nth-child(5n) { margin-bottom: .8mm; }
+.omr-ox .omr-row:last-child { margin-bottom: 0; }
+.omr-ox .omr-no { width: 7mm; font-size: 7pt; margin-right: .5mm; }
+.omr-ox .omr-bubble { width: 3.5mm; height: 3.5mm; border-width: .4mm; font-size: 5.5pt; font-weight: 600; }
 .omr-foot { margin-top: auto; padding-top: 3mm; font-size: 8pt; color: #555; text-align: center; }
 
 @page { size: A4 portrait; margin: 0; }
