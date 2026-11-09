@@ -1,0 +1,483 @@
+{
+  "assetRoot": "/hunter-assets/",
+  "brand": "이윤탁 형사법",
+  "pets": {
+    "law-rabbit": {
+      "src": "progression/pets/law-rabbit.png",
+      "width": 320,
+      "height": 312,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.961538
+      },
+      "title": "법전 토끼",
+      "facing": "right",
+      "heightInViewport": 0.12,
+      "floatY": 0
+    },
+    "book-shiba": {
+      "src": "progression/pets/book-shiba.png",
+      "width": 320,
+      "height": 301,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.960133
+      },
+      "title": "책가방 시바",
+      "facing": "right",
+      "heightInViewport": 0.13,
+      "floatY": 0
+    },
+    "precedent-owl": {
+      "src": "progression/pets/precedent-owl.png",
+      "width": 320,
+      "height": 235,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.948936
+      },
+      "title": "판례 부엉이",
+      "facing": "right",
+      "heightInViewport": 0.14,
+      "floatY": 0.085
+    },
+    "evidence-fox": {
+      "src": "progression/pets/evidence-fox.png",
+      "width": 320,
+      "height": 270,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.955556
+      },
+      "title": "증거 여우",
+      "facing": "right",
+      "heightInViewport": 0.14,
+      "floatY": 0
+    },
+    "iron-tortoise": {
+      "src": "progression/pets/iron-tortoise.png",
+      "width": 320,
+      "height": 270,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.955556
+      },
+      "title": "철갑 거북",
+      "facing": "right",
+      "heightInViewport": 0.13,
+      "floatY": 0
+    },
+    "starlight-raven": {
+      "src": "progression/pets/starlight-raven.png",
+      "width": 320,
+      "height": 256,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.953125
+      },
+      "title": "별빛 까마귀",
+      "facing": "right",
+      "heightInViewport": 0.145,
+      "floatY": 0.1
+    },
+    "azure-dragonling": {
+      "src": "progression/pets/azure-dragonling.png",
+      "width": 320,
+      "height": 253,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.952569
+      },
+      "title": "청염 아기용",
+      "facing": "right",
+      "heightInViewport": 0.16,
+      "floatY": 0.1
+    },
+    "golden-haechi": {
+      "src": "progression/pets/golden-haechi.png",
+      "width": 320,
+      "height": 319,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.962382
+      },
+      "title": "황금 해치",
+      "facing": "right",
+      "heightInViewport": 0.16,
+      "floatY": 0
+    }
+  },
+  "weapons": {
+    "crystal-sword": {
+      "src": "progression/weapons/crystal-sword.png",
+      "width": 829,
+      "height": 294,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "grip": {
+        "x": 0.155609,
+        "y": 0.517007
+      },
+      "title": "푸른 수정검",
+      "facing": "right",
+      "widthInHunterHeights": 0.94
+    },
+    "verdict-hammer": {
+      "src": "progression/weapons/verdict-hammer.png",
+      "width": 841,
+      "height": 328,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "grip": {
+        "x": 0.196195,
+        "y": 0.5
+      },
+      "title": "판결 망치",
+      "facing": "right",
+      "widthInHunterHeights": 1.0
+    },
+    "azure-dragon-glaive": {
+      "src": "progression/weapons/azure-dragon-glaive.png",
+      "width": 872,
+      "height": 268,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "grip": {
+        "x": 0.163991,
+        "y": 0.384328
+      },
+      "title": "청룡 언월도",
+      "facing": "right",
+      "widthInHunterHeights": 1.13
+    },
+    "justice-greatsword": {
+      "src": "progression/weapons/justice-greatsword.png",
+      "width": 884,
+      "height": 342,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "grip": {
+        "x": 0.179864,
+        "y": 0.497076
+      },
+      "title": "황금 정의대검",
+      "facing": "right",
+      "widthInHunterHeights": 1.24
+    }
+  },
+  "bosses": {
+    "iron-warden": {
+      "src": "progression/bosses/iron-warden.png",
+      "width": 630,
+      "height": 604,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.980132
+      },
+      "title": "철쇄 간수장",
+      "facing": "left",
+      "heightInViewport": 0.43
+    },
+    "crimson-ink-demon": {
+      "src": "progression/bosses/crimson-ink-demon.png",
+      "width": 607,
+      "height": 604,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.980132
+      },
+      "title": "붉은 잉크 악마",
+      "facing": "left",
+      "heightInViewport": 0.5
+    },
+    "magma-dragon": {
+      "src": "progression/bosses/magma-dragon.png",
+      "width": 672,
+      "height": 604,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.980132
+      },
+      "title": "용암룡",
+      "facing": "left",
+      "heightInViewport": 0.55
+    },
+    "abyssal-colossus": {
+      "src": "progression/bosses/abyssal-colossus.png",
+      "width": 694,
+      "height": 602,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.980066
+      },
+      "title": "심연 괴수",
+      "facing": "left",
+      "heightInViewport": 0.57
+    },
+    "obsidian-king": {
+      "src": "progression/bosses/obsidian-king.png",
+      "width": 687,
+      "height": 604,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.980132
+      },
+      "title": "흑요석 용왕",
+      "facing": "left",
+      "heightInViewport": 0.62
+    },
+    "obsidian-king-enraged": {
+      "src": "progression/bosses/obsidian-king-enraged.png",
+      "width": 653,
+      "height": 604,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.980132
+      },
+      "title": "흑요석 용왕 · 폭주",
+      "facing": "left",
+      "heightInViewport": 0.65
+    }
+  },
+  "characters": {
+    "male-veteran-ready": {
+      "src": "progression/characters/male-veteran-ready.png",
+      "width": 315,
+      "height": 468,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.974359
+      },
+      "handGrip": {
+        "x": 0.861952,
+        "y": 0.508144
+      },
+      "title": "남자 정예 헌터 대기",
+      "facing": "right",
+      "heightInViewport": 0.39
+    },
+    "female-veteran-ready": {
+      "src": "progression/characters/female-veteran-ready.png",
+      "width": 327,
+      "height": 468,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.974359
+      },
+      "handGrip": {
+        "x": 0.823438,
+        "y": 0.508144
+      },
+      "title": "여자 정예 헌터 대기",
+      "facing": "right",
+      "heightInViewport": 0.39
+    },
+    "male-legendary-ready": {
+      "src": "progression/characters/male-legendary-ready.png",
+      "width": 356,
+      "height": 468,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.974359
+      },
+      "handGrip": {
+        "x": 0.892736,
+        "y": 0.524966
+      },
+      "title": "남자 전설 헌터 대기",
+      "facing": "right",
+      "heightInViewport": 0.39
+    },
+    "female-legendary-ready": {
+      "src": "progression/characters/female-legendary-ready.png",
+      "width": 353,
+      "height": 468,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.974359
+      },
+      "handGrip": {
+        "x": 0.865104,
+        "y": 0.523066
+      },
+      "title": "여자 전설 헌터 대기",
+      "facing": "right",
+      "heightInViewport": 0.39
+    },
+    "male-veteran-attack": {
+      "src": "progression/characters/male-veteran-attack.png",
+      "width": 371,
+      "height": 468,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.974359
+      },
+      "handGrip": {
+        "x": 0.875589,
+        "y": 0.446925
+      },
+      "title": "남자 정예 헌터 공격",
+      "facing": "right",
+      "heightInViewport": 0.39
+    },
+    "female-veteran-attack": {
+      "src": "progression/characters/female-veteran-attack.png",
+      "width": 371,
+      "height": 468,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.974359
+      },
+      "handGrip": {
+        "x": 0.872646,
+        "y": 0.438927
+      },
+      "title": "여자 정예 헌터 공격",
+      "facing": "right",
+      "heightInViewport": 0.39
+    },
+    "male-legendary-attack": {
+      "src": "progression/characters/male-legendary-attack.png",
+      "width": 382,
+      "height": 468,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.974359
+      },
+      "handGrip": {
+        "x": 0.878748,
+        "y": 0.445074
+      },
+      "title": "남자 전설 헌터 공격",
+      "facing": "right",
+      "heightInViewport": 0.39
+    },
+    "female-legendary-attack": {
+      "src": "progression/characters/female-legendary-attack.png",
+      "width": 386,
+      "height": 468,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.974359
+      },
+      "handGrip": {
+        "x": 0.875333,
+        "y": 0.439658
+      },
+      "title": "여자 전설 헌터 공격",
+      "facing": "right",
+      "heightInViewport": 0.39
+    }
+  },
+  "backgrounds": {
+    "volcanic-cavern": {
+      "src": "progression/backgrounds/volcanic-cavern.webp",
+      "title": "용암 동굴",
+      "groundY": 0.77,
+      "width": 1104,
+      "height": 674
+    },
+    "abyss-throne": {
+      "src": "progression/backgrounds/abyss-throne.webp",
+      "title": "심연의 왕좌",
+      "groundY": 0.772,
+      "width": 1104,
+      "height": 674
+    }
+  },
+  "existingAssets": {
+    "starterWeapon": "combat/weapons/yuntak-baton.png",
+    "starterBoss": "enemies/ink-boss.png",
+    "starterHunterManifest": "manifest.json",
+    "starterCombatManifest": "combat/combat-manifest.json"
+  },
+  "exampleTiers": [
+    {
+      "tier": 1,
+      "title": "입문",
+      "petUnlocks": [
+        "law-rabbit",
+        "book-shiba"
+      ],
+      "weapon": "starterWeapon",
+      "encounters": [
+        [
+          "starterBoss"
+        ]
+      ],
+      "hunterSet": "starter"
+    },
+    {
+      "tier": 2,
+      "title": "수련",
+      "petUnlocks": [
+        "precedent-owl",
+        "evidence-fox"
+      ],
+      "weapon": "crystal-sword",
+      "encounters": [
+        [
+          "iron-warden"
+        ]
+      ],
+      "hunterSet": "veteran"
+    },
+    {
+      "tier": 3,
+      "title": "정예",
+      "petUnlocks": [
+        "iron-tortoise",
+        "starlight-raven"
+      ],
+      "weapon": "verdict-hammer",
+      "encounters": [
+        [
+          "crimson-ink-demon"
+        ]
+      ],
+      "hunterSet": "veteran"
+    },
+    {
+      "tier": 4,
+      "title": "달인",
+      "petUnlocks": [
+        "azure-dragonling"
+      ],
+      "weapon": "azure-dragon-glaive",
+      "encounters": [
+        [
+          "magma-dragon"
+        ]
+      ],
+      "hunterSet": "legendary",
+      "background": "volcanic-cavern"
+    },
+    {
+      "tier": 5,
+      "title": "전설",
+      "petUnlocks": [
+        "golden-haechi"
+      ],
+      "weapon": "justice-greatsword",
+      "encounters": [
+        [
+          "abyssal-colossus"
+        ],
+        [
+          "obsidian-king",
+          "obsidian-king-enraged"
+        ]
+      ],
+      "hunterSet": "legendary",
+      "background": "abyss-throne"
+    }
+  ]
+}

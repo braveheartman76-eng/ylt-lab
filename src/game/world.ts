@@ -17,17 +17,56 @@ export const THEMES: Theme[] = [
   { name: '모의고사장', bg: 'library', sky: ['#b5c7d9', '#eef3f8'], ground: '#5f6b78', accent: '#475569' },
 ]
 
-export const STAGE_SIZE = 5 // 스테이지당 몬스터를 쓰러뜨리는 정답 수
+export const STAGE_SIZE = 5 // 일반 스테이지에서 몬스터를 쓰러뜨리는 정답 수
+export const BOSS_HP = 8 // 보스 스테이지는 더 오래 싸운다(크리티컬은 2배 피해)
+export const stageHp = (stage: number) => (isBossStage(stage) ? BOSS_HP : STAGE_SIZE)
 export const MAX_PLAYER_HP = 3
 export const themeOf = (stage: number) => THEMES[(stage - 1) % THEMES.length]
 export const isBossStage = (stage: number) => stage % 5 === 0
 
-/** 스테이지의 몬스터 그림: 보스 스테이지는 잉크 보스, 그 외에는 5종을 순서대로 */
+/** 일반 스테이지의 몬스터 그림: 5종 순환 (보스 스테이지는 bossFor 로 단계에 맞는 보스) */
 const ENEMY_CYCLE = ['inkSlime', 'falsePrecedentGhost', 'prisonCage', 'hourglassGoblin', 'statuteMimic']
-export function enemyKeyFor(stage: number): string {
-  if (isBossStage(stage)) return 'inkBoss'
+export function enemyKeyFor(stage: number, tier = 1): string {
+  if (isBossStage(stage)) return bossFor(stage, tier)
   const n = stage - Math.floor(stage / 5) - 1 // 앞선 '보스가 아닌' 스테이지 수
   return ENEMY_CYCLE[n % ENEMY_CYCLE.length]
+}
+
+// ───────────────────────── 성장 단계 (입문 → 수련 → 정예 → 달인 → 전설)
+// 단계는 '게임 레벨'로 정한다. 레벨은 학습 보상(처음 푸는 문제/복습 예정 문항 정답)으로만 오르므로 반복 파밍으로 올릴 수 없다.
+// id 는 public/hunter-assets/progression/progression-manifest.json 과 같다(tests/engine/progression.test.mjs 로 검증).
+export interface Tier {
+  tier: number
+  title: string
+  minLevel: number
+  pets: string[] // 이 단계에서 새로 해금되는 펫
+  weapon: string | null // null = 기본 헌터가 들고 있는 각인 기본봉
+  boss: string // 이 단계 보스 스테이지의 보스
+  heroSet: 'starter' | 'veteran' | 'legendary'
+  bossBg: string | null // 보스 스테이지 전용 배경 (null = 일반 스테이지 배경)
+}
+
+export const TIERS: Tier[] = [
+  { tier: 1, title: '입문', minLevel: 1, pets: ['law-rabbit', 'book-shiba'], weapon: null, boss: 'inkBoss', heroSet: 'starter', bossBg: null },
+  { tier: 2, title: '수련', minLevel: 3, pets: ['precedent-owl', 'evidence-fox'], weapon: 'crystal-sword', boss: 'iron-warden', heroSet: 'veteran', bossBg: 'academy' },
+  { tier: 3, title: '정예', minLevel: 6, pets: ['iron-tortoise', 'starlight-raven'], weapon: 'verdict-hammer', boss: 'crimson-ink-demon', heroSet: 'veteran', bossBg: 'library' },
+  { tier: 4, title: '달인', minLevel: 10, pets: ['azure-dragonling'], weapon: 'azure-dragon-glaive', boss: 'magma-dragon', heroSet: 'legendary', bossBg: 'volcanic-cavern' },
+  { tier: 5, title: '전설', minLevel: 15, pets: ['golden-haechi'], weapon: 'justice-greatsword', boss: 'abyssal-colossus', heroSet: 'legendary', bossBg: 'abyss-throne' },
+]
+
+export const tierOf = (level: number): Tier => [...TIERS].reverse().find(t => level >= t.minLevel) ?? TIERS[0]
+export const unlockedPets = (tier: number): string[] => TIERS.filter(t => t.tier <= tier).flatMap(t => t.pets)
+export const nextTier = (tier: number): Tier | null => TIERS.find(t => t.tier === tier + 1) ?? null
+
+/** 보스 스테이지의 보스. 전설 단계는 심연 괴수 → 흑요석 용왕 순서로 번갈아 나온다. */
+export function bossFor(stage: number, tier: number): string {
+  const t = TIERS.find(x => x.tier === tier) ?? TIERS[0]
+  if (t.tier === 5) return Math.floor(stage / 5) % 2 === 1 ? 'abyssal-colossus' : 'obsidian-king'
+  return t.boss
+}
+/** 흑요석 용왕은 체력이 절반 이하가 되면 폭주(두 번째 형태)한다. */
+export function bossForm(key: string, hp: number, max: number): string {
+  return key === 'obsidian-king' && hp <= Math.floor(max / 2) ? 'obsidian-king-enraged' : key
 }
 
 export interface Item {

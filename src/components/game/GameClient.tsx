@@ -9,7 +9,9 @@ import { recommend, unitStats } from '@/game/engine/stats'
 import type { Attempt, GameQuestion } from '@/game/engine/types'
 import { emptyGame, loadGame, saveGame, type SavedGame } from '@/game/store'
 import { speak, stopSpeaking, ttsSupported, unlockTts, readable } from '@/game/tts'
-import { ITEMS, MAX_PLAYER_HP, STAGE_SIZE, dropFor, isBossStage, roomName, themeOf } from '@/game/world'
+import { configureSfx, playSfx, unlockSfx } from '@/game/sfx'
+import { loadProgManifest, type ProgManifest } from '@/game/assets'
+import { ITEMS, MAX_PLAYER_HP, TIERS, dropFor, isBossStage, nextTier, roomName, stageHp, themeOf, tierOf, unlockedPets } from '@/game/world'
 
 type Tab = 'play' | 'review' | 'report' | 'room'
 const KIND_LABEL: Record<PickKind, string> = { critical: '⚠ 불시 공격 · 미처리 오답', review: '복습', new: '새 문제', challenge: '도전', any: '장기 확인' }
@@ -24,6 +26,7 @@ interface Feedback {
   drop?: string
   cleared?: boolean
   crit?: boolean
+  growth?: string // 레벨 업 / 성장 단계 상승 안내
 }
 
 export default function GameClient() {
@@ -36,7 +39,8 @@ export default function GameClient() {
   const [current, setCurrent] = useState<{ q: GameQuestion; kind: PickKind } | null>(null)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const [flash, setFlash] = useState<Flash | null>(null)
-  const [monsterHp, setMonsterHp] = useState(STAGE_SIZE)
+  const [monsterHp, setMonsterHp] = useState(stageHp(1))
+  const [prog, setProg] = useState<ProgManifest | null>(null)
   const [playerHp, setPlayerHp] = useState(MAX_PLAYER_HP)
   const [reviewOnly, setReviewOnly] = useState(false)
   const [focusUnit, setFocusUnit] = useState<string | undefined>()
@@ -58,6 +62,7 @@ export default function GameClient() {
       const data = res && res.ok ? await res.json().catch(() => null) : null
       if (cancelled) return
       setGame(saved)
+      setMonsterHp(stageHp(saved.stage))
       setLoaded(true)
       if (data?.questions) {
         setQuestions(data.questions)
@@ -67,12 +72,18 @@ export default function GameClient() {
     return () => { cancelled = true }
   }, [])
   useEffect(() => { if (loaded) saveGame(game) }, [game, loaded])
+  useEffect(() => { configureSfx(game.sfx) }, [game.sfx])
+  useEffect(() => { loadProgManifest().then(setProg) }, [])
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(id) }, [])
 
   const dueCount = useMemo(() => questions.filter(q => game.schedules[q.id] && isDue(game.schedules[q.id], now)).length, [questions, game.schedules, now])
   const openCount = useMemo(() => questions.filter(q => isOpenWrong(game.schedules[q.id])).length, [questions, game.schedules])
   const lv = levelFromXp(game.xp)
   const th = themeOf(game.stage)
+  const tier = tierOf(lv.level)
+  const nt = nextTier(tier.tier)
+  const petsOpen = unlockedPets(tier.tier)
+  const pet = game.pet && petsOpen.includes(game.pet) ? game.pet : petsOpen[0]
 
   const nextRun = useCallback((o?: { review: boolean; unit?: string }) => {
     const ro = o ? o.review : reviewOnly
@@ -85,6 +96,7 @@ export default function GameClient() {
     setGate(key !== lastTopic) // 소제목이 바뀔 때만 문(푯말)이 나온다
     setLastTopic(key)
     setCurrent({ q: p.question, kind: p.kind })
+    if (p.kind === 'critical') playSfx('ambush')
     setFeedback(null)
     setPhase('running')
   }, [questions, game.schedules, game.attempts, recent, reviewOnly, focusUnit, served, lastTopic])
@@ -109,6 +121,7 @@ export default function GameClient() {
       elapsedMs: t - startedAt, attemptNo: r.state.attemptCount, wasReview: r.wasReview, isFirst: r.isFirst, boxAfter: r.state.box,
     }
     const stage = g.stage
+    const lvBefore = levelFromXp(g.xp).level
     let kills = g.stageKills, items = g.items, coins = g.coins + r.reward.coins
     let hp = playerHp, mhp = monsterHp, drop: string | undefined, cleared = false
     if (correct) {
@@ -117,6 +130,7 @@ export default function GameClient() {
       if (mhp <= 0) {
         const it = dropFor(stage, items)
         if (it) { items = [...items, it.id]; drop = `${it.emoji} ${it.name}` } else coins += 20
+        if (isBossStage(stage)) coins += 30 // 보스 처치 보너스
         cleared = true
       }
     } else {
@@ -128,7 +142,7 @@ export default function GameClient() {
     setGame(next)
     setNow(t)
     setFlash({ kind: correct ? 'hit' : 'miss', nonce: t, crit: correct && current.kind === 'critical', dmg: correct ? (r.reward.xp ? `+${r.reward.xp} XP` : '정답!') : '오답…' })
-    setMonsterHp(cleared ? STAGE_SIZE : mhp)
+    setMonsterHp(cleared ? stageHp(stage + 1) : mhp)
     setPlayerHp(hp <= 0 ? MAX_PLAYER_HP : hp)
     setRecent(r => [q.id, ...r].slice(0, 3))
     const mins = Math.round((r.state.nextReviewAt - t) / 60000)
@@ -136,11 +150,24 @@ export default function GameClient() {
     const nowOpen = isOpenWrong(r.state)
     const baseText = mins < 120 ? `${mins}분 뒤 다시 확인해요` : mins < 2880 ? '내일 다시 나와요' : `${Math.round(mins / 1440)}일 뒤 다시 나와요`
     const exp = q.explanation ?? ''
-    const fb: Feedback = { correct, answer: q.type === 'ox' ? q.answer : `${q.answer}번`, explanation: exp, xp: r.reward.xp, coins: r.reward.coins, nextText: nowOpen ? `미처리 오답 · 연속 정답 ${r.state.streak}/${CLEAR_STREAK} — 처리될 때까지 접속할 때마다 나와요` : wasOpen ? `오답 처리 완료! · ${baseText}` : baseText, drop, cleared, crit: correct && current.kind === 'critical' }
+    // 레벨 업 / 성장 단계 상승(펫·무기·보스가 바뀐다)
+    const lvAfter = levelFromXp(next.xp).level
+    const tBefore = tierOf(lvBefore), tAfter = tierOf(lvAfter)
+    let growth: string | undefined
+    if (tAfter.tier > tBefore.tier) {
+      const petNames = tAfter.pets.map(id => prog?.pets[id]?.title ?? id).join(', ')
+      const wName = tAfter.weapon ? (prog?.weapons[tAfter.weapon]?.title ?? tAfter.weapon) : null
+      growth = `성장 단계 상승! 「${tAfter.title}」 헌터 (Lv.${lvAfter})${petNames ? ` · 새 펫: ${petNames}` : ''}${wName ? ` · 새 무기: ${wName}` : ''}`
+    } else if (lvAfter > lvBefore) growth = `레벨 업! Lv.${lvAfter}`
+    playSfx(correct ? 'attack' : 'hit')
+    window.setTimeout(() => playSfx(correct ? (current.kind === 'critical' ? 'critical' : 'correct') : 'wrong'), correct ? 110 : 60)
+    if (cleared) window.setTimeout(() => playSfx('clear'), 700)
+    if (growth) window.setTimeout(() => playSfx('levelup'), cleared ? 1500 : 800)
+    const fb: Feedback = { correct, answer: q.type === 'ox' ? q.answer : `${q.answer}번`, explanation: exp, xp: r.reward.xp, coins: r.reward.coins, nextText: nowOpen ? `미처리 오답 · 연속 정답 ${r.state.streak}/${CLEAR_STREAK} — 처리될 때까지 접속할 때마다 나와요` : wasOpen ? `오답 처리 완료! · ${baseText}` : baseText, drop, cleared, crit: correct && current.kind === 'critical', growth }
     setFeedback(fb)
     setPhase('feedback')
-    speak(`${correct ? '정답입니다.' : `오답입니다. 정답은 ${fb.answer}.`} ${readable(exp.split('\n')[0] ?? '')}`, g.tts)
-  }, [phase, current, playerHp, monsterHp, game, startedAt])
+    speak(`${correct ? '정답입니다.' : `오답입니다. 정답은 ${fb.answer}.`} ${growth ? growth + '.' : ''} ${readable(exp.split('\n')[0] ?? '')}`, g.tts)
+  }, [phase, current, playerHp, monsterHp, game, startedAt, prog])
 
   // 키보드: O/X, 1~4
   useEffect(() => {
@@ -163,6 +190,7 @@ export default function GameClient() {
 
   const start = (opts: { review?: boolean; unit?: string }) => {
     unlockTts()
+    unlockSfx() // 모바일: 첫 터치에서 오디오 잠금 해제
     setReviewOnly(!!opts.review)
     setFocusUnit(opts.unit)
     setTab('play')
@@ -206,8 +234,8 @@ export default function GameClient() {
       {tab === 'play' && (
         <section>
           <div className="relative">
-            <RunnerCanvas phase={phase} stage={game.stage} monsterHp={monsterHp} monsterMax={STAGE_SIZE} playerHp={playerHp} flash={flash}
-              runMs={3800} onArrive={arrive} hero={game.hero} sign={current ? { section: current.q.section ?? current.q.unitTitle, topic: current.q.topic ?? null, gate } : null} critical={current?.kind === 'critical' && (phase === 'running' || phase === 'question')} />
+            <RunnerCanvas phase={phase} stage={game.stage} monsterHp={monsterHp} monsterMax={stageHp(game.stage)} playerHp={playerHp} flash={flash}
+              runMs={3800} onArrive={arrive} hero={game.hero} tier={tier.tier} pet={pet} onSfx={playSfx} sign={current ? { section: current.q.section ?? current.q.unitTitle, topic: current.q.topic ?? null, gate } : null} critical={current?.kind === 'critical' && (phase === 'running' || phase === 'question')} />
             {phase === 'idle' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-black/45 p-4 text-center text-white">
                 <div className="text-lg font-bold">노량진역에 도착했습니다</div>
@@ -256,6 +284,7 @@ export default function GameClient() {
                     {feedback.xp > 0 && <span className="ml-2 text-green-700">+{feedback.xp}XP +{feedback.coins}🪙</span>}</div>
                   {feedback.explanation && <p className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-gray-700">{feedback.explanation}</p>}
                   <div className="mt-1 text-[11px] text-gray-500">{feedback.nextText}</div>
+                  {feedback.growth && <div className="mt-1 rounded bg-amber-100 px-2 py-1 text-[12px] font-bold text-amber-900">🎉 {feedback.growth}</div>}
                   {feedback.cleared && <div className="mt-1 font-bold text-blue-700">스테이지 클리어! {feedback.drop ? `획득: ${feedback.drop}` : '+20🪙'}</div>}
                   <button onClick={() => nextRun()} className="mt-2 w-full rounded-lg bg-gray-800 py-2 text-white">다음으로 (자동 진행)</button>
                 </div>
@@ -269,6 +298,8 @@ export default function GameClient() {
           <div className="mt-3 flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs shadow-sm">
             <label className="flex items-center gap-1"><input type="checkbox" checked={game.tts.enabled} disabled={!ttsSupported()}
               onChange={e => { if (e.target.checked) unlockTts(); else stopSpeaking(); setGame(g => ({ ...g, tts: { ...g.tts, enabled: e.target.checked } })) }} /> 음성 읽기{!ttsSupported() && ' (미지원)'}</label>
+            <label className="flex items-center gap-1"><input type="checkbox" checked={game.sfx.enabled}
+              onChange={e => { if (e.target.checked) unlockSfx(); setGame(g => ({ ...g, sfx: { ...g.sfx, enabled: e.target.checked } })); if (e.target.checked) window.setTimeout(() => playSfx('coin'), 50) }} /> 효과음</label>
             <label className="flex items-center gap-1">속도 <input type="range" min={0.7} max={1.5} step={0.1} value={game.tts.rate}
               onChange={e => setGame(g => ({ ...g, tts: { ...g.tts, rate: Number(e.target.value) } }))} /> {game.tts.rate.toFixed(1)}x</label>
             {phase !== 'idle' && <button className="rounded bg-gray-200 px-2 py-1" onClick={() => { stopSpeaking(); setPhase('idle'); setCurrent(null) }}>그만하기</button>}
@@ -318,7 +349,38 @@ export default function GameClient() {
         <section className="rounded-xl bg-white p-3 shadow-sm">
           <div className="text-base font-bold">{roomName(game.items.length)}</div>
           <p className="text-[12px] text-gray-500">STAGE {game.stage} · {th.name} · 보유 {game.items.length}/{ITEMS.length}</p>
-          <div className="mt-3 grid grid-cols-5 gap-2 text-center">
+          <div className="mt-3 rounded-lg bg-slate-50 p-3 text-[12px]">
+            <div className="font-bold text-slate-800">성장 단계 {tier.tier}/{TIERS.length} 「{tier.title}」 · Lv.{lv.level}</div>
+            <div className="mt-1 text-slate-600">
+              무기: {tier.weapon ? (prog?.weapons[tier.weapon]?.title ?? tier.weapon) : '각인 기본봉'} · 보스: {isBossStage(game.stage) ? '지금 보스 스테이지!' : `STAGE ${Math.ceil(game.stage / 5) * 5}`}
+              {nt ? ` · 다음 단계 「${nt.title}」은 Lv.${nt.minLevel}에서 (무기·펫·보스 변화)` : ' · 최고 단계입니다'}
+            </div>
+            <p className="mt-1 text-[11px] text-slate-400">성장 단계는 학습 보상(처음 푸는 문제/복습 문제 정답)으로 얻는 경험치로만 오릅니다.</p>
+            <div className="mt-2 flex gap-2">
+              {(['male', 'female'] as const).map(hk => (
+                <button key={hk} onClick={() => setGame(g => ({ ...g, hero: hk }))}
+                  className={`rounded-full px-3 py-1 font-bold ${game.hero === hk ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'}`}>{hk === 'male' ? '남자 헌터' : '여자 헌터'}</button>))}
+            </div>
+          </div>
+          <div className="mt-3 text-[13px] font-bold">함께 다닐 펫</div>
+          <div className="mt-1 grid grid-cols-4 gap-2 text-center">
+            {TIERS.flatMap(t => t.pets.map(id => ({ id, t }))).map(({ id, t }) => {
+              const open = petsOpen.includes(id)
+              const def = prog?.pets[id]
+              return (
+                <button key={id} disabled={!open} onClick={() => setGame(g => ({ ...g, pet: id }))} title={def?.title ?? id}
+                  className={`rounded-lg border p-1 ${pet === id ? 'border-blue-500 bg-blue-50' : 'bg-gray-50'} ${open ? '' : 'opacity-40'}`}>
+                  {def && open
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={`/hunter-assets/${def.src}`} alt={def.title} loading="lazy" className="mx-auto h-12 w-full object-contain" />
+                    : <div className="flex h-12 items-center justify-center text-xl">{open ? '🐾' : '🔒'}</div>}
+                  <div className="text-[10px] leading-tight">{open ? (def?.title ?? id) : `Lv.${t.minLevel}`}</div>
+                </button>
+              )
+            })}
+          </div>
+          <div className="mt-4 text-[13px] font-bold">공부방 아이템</div>
+          <div className="mt-1 grid grid-cols-5 gap-2 text-center">
             {ITEMS.map(i => {
               const has = game.items.includes(i.id)
               return <div key={i.id} className={`rounded-lg border p-2 ${has ? 'bg-yellow-50' : 'bg-gray-50 opacity-40'}`} title={i.name}>

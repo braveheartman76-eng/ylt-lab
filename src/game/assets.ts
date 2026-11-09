@@ -64,3 +64,37 @@ export async function loadHunterAssets(): Promise<HunterAssets | null> {
     return null
   }
 }
+
+// ───────────────────────── 성장 팩(펫·무기·정예/전설 헌터·상위 보스·보스 배경): 필요할 때만 불러온다(약 7MB)
+export interface ProgSprite { src: string; anchor: { x: number; y: number }; heightInViewport: number; floatY?: number; handGrip?: { x: number; y: number } }
+export interface ProgWeapon { src: string; grip: { x: number; y: number }; widthInHunterHeights: number; title: string }
+export interface ProgManifest {
+  pets: Record<string, ProgSprite & { title: string }>
+  weapons: Record<string, ProgWeapon>
+  bosses: Record<string, ProgSprite & { title: string }>
+  characters: Record<string, ProgSprite & { handGrip: { x: number; y: number } }>
+  backgrounds: Record<string, { src: string; groundY: number }>
+}
+
+const PROG = ROOT + 'progression/'
+export async function loadProgManifest(): Promise<ProgManifest | null> {
+  try {
+    const r = await fetch(PROG + 'progression-manifest.json')
+    if (!r.ok) return null
+    return (await r.json()) as ProgManifest
+  } catch {
+    return null
+  }
+}
+
+const cache = new Map<string, HTMLImageElement | 'loading' | 'error'>()
+/** manifest 의 src(예: 'progression/pets/law-rabbit.png')로 이미 불러온 이미지를 돌려주고, 아직이면 불러오기를 시작한 뒤 null 을 돌려준다(그리는 쪽은 도형/기본 그림으로 대체). */
+export function peekImage(src: string): HTMLImageElement | null {
+  const hit = cache.get(src)
+  if (hit && hit !== 'loading' && hit !== 'error') return hit
+  if (!hit) {
+    cache.set(src, 'loading')
+    load(ROOT + src).then(img => cache.set(src, img), () => cache.set(src, 'error')) // manifest 의 src 는 'progression/…' 로 시작
+  }
+  return null
+}

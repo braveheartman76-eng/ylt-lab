@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { themeOf, isBossStage, enemyKeyFor } from '@/game/world'
-import { loadHunterAssets, type HunterAssets, type HeroKey, type GateArt } from '@/game/assets'
+import { themeOf, isBossStage, enemyKeyFor, bossForm, TIERS } from '@/game/world'
+import { loadHunterAssets, loadProgManifest, peekImage, type HunterAssets, type HeroKey, type GateArt, type ProgManifest } from '@/game/assets'
+import type { SfxName } from '@/game/sfx'
 
 export type RunPhase = 'idle' | 'running' | 'question' | 'feedback'
 
@@ -26,6 +27,9 @@ interface Props {
   /** 대제목/소제목 푯말. gate=true 면 달리는 중 문(아치)이 다가와 캐릭터가 통과한다(소제목이 바뀔 때). */
   sign?: { section: string; topic: string | null; gate: boolean } | null
   hero?: HeroKey // 남/여 헌터(그림 자료가 있을 때)
+  tier?: number // 성장 단계 1~5: 헌터 복장·무기·보스·보스 배경이 바뀐다
+  pet?: string | null // 따라다니는 펫 id
+  onSfx?: (name: SfxName) => void // 효과음 신호(점프/부딪힘/코인/문 통과)
 }
 
 const W = 360
@@ -46,12 +50,13 @@ export default function RunnerCanvas(p: Props) {
   const cv = useRef<HTMLCanvasElement>(null)
   const props = useRef(p)
   useEffect(() => { props.current = p })
+  const progRef = useRef<ProgManifest | null>(null) // 성장 팩 목록(작은 JSON). 이미지는 필요할 때만 불러온다.
   const assetsRef = useRef<HunterAssets | null>(null) // 사용자 제작 그림. 불러오기 전/실패 시 null → 도형 그림
 
   const world = useRef<World>({
     scroll: 0, t: 0, runT: 0, arrived: false, lastPhase: '',
     py: 0, vy: 0, crit: false, knock: 0, stumble: 0, atk: 0, hurt: 0, mHit: 0, mLunge: 0, shake: 0,
-    obs: [], coins: [], pops: [], lastFlash: -1,
+    obs: [], coins: [], pops: [], lastFlash: -1, gatePlayed: false,
   })
 
   useEffect(() => {
@@ -64,11 +69,12 @@ export default function RunnerCanvas(p: Props) {
     let raf = 0
     let alive = true
     loadHunterAssets().then(a => { if (alive) assetsRef.current = a })
+    loadProgManifest().then(m => { if (alive) progRef.current = m })
     let last = performance.now()
     const w = world.current
 
     // 화면 아무 곳이나 터치하면 점프(엄지로 누르기 쉽게). 버튼·링크·탭 영역은 제외. 스페이스바도 지원.
-    const jump = () => { if (w.py === 0 && w.vy === 0 && props.current.phase === 'running') w.vy = JUMP_V }
+    const jump = () => { if (w.py === 0 && w.vy === 0 && props.current.phase === 'running') { w.vy = JUMP_V; props.current.onSfx?.('jump') } }
     const onPointer = (e: PointerEvent) => {
       const t = e.target as Element | null
       if (t?.closest('button, a, input, label, nav, [role="tab"]')) return
@@ -85,7 +91,7 @@ export default function RunnerCanvas(p: Props) {
       // 단계 전환 처리
       if (w.lastPhase !== pr.phase) {
         if (pr.phase === 'running') {
-          w.runT = 0; w.arrived = false
+          w.runT = 0; w.arrived = false; w.gatePlayed = false
           // 장애물은 달리기 시작 후 1초 뒤에 화면에 들어온다(문제를 푼 직후엔 반응할 틈이 필요)
           w.obs = [{ x: W + RUN_SPEED * OBSTACLE_ENTER_S, w: 22, h: 20, passed: false }]
           w.coins = [0, 1, 2, 3].map(i => ({ x: W + 40 + i * 70, y: GROUND - 46 - (i % 2) * 16, got: false }))
@@ -106,6 +112,8 @@ export default function RunnerCanvas(p: Props) {
         w.runT += dt * 1000
         if (w.runT >= pr.runMs && !w.arrived) { w.arrived = true; pr.onArrive() }
         w.obs.forEach(o => { o.x -= speed * dt })
+        // 단원 문이 캐릭터 위치를 지나는 순간 차임
+        if (pr.sign?.gate && !w.gatePlayed && W + 90 - Math.min(1, w.runT / pr.runMs) * (W + 220) <= 70) { w.gatePlayed = true; pr.onSfx?.('gate') }
         w.coins.forEach(c => { c.x -= speed * dt })
       }
       // 점프 물리
@@ -119,12 +127,13 @@ export default function RunnerCanvas(p: Props) {
           o.hit = true; o.hitT = 0; o.passed = true
           w.stumble = 0.8; w.knock = 1; w.hurt = 1
           w.pops.push({ x: px + 6, y: GROUND - 80, text: '쿵!', color: '#dc2626', t: 0 })
+          pr.onSfx?.('hit')
         } else if (!o.passed && o.x + o.w < px - 10) {
           o.passed = true // 점프로 무사히 넘음
           w.pops.push({ x: px + 6, y: GROUND - 80, text: '점프 성공!', color: '#16a34a', t: 0 })
         }
       })
-      w.coins.forEach(c => { if (!c.got && Math.abs(c.x - px) < 12 && Math.abs((GROUND - c.y) - w.py - 14) < 28) { c.got = true; w.pops.push({ x: px + 8, y: GROUND - 70, text: '+1', color: '#ca8a04', t: 0 }) } })
+      w.coins.forEach(c => { if (!c.got && Math.abs(c.x - px) < 12 && Math.abs((GROUND - c.y) - w.py - 14) < 28) { c.got = true; w.pops.push({ x: px + 8, y: GROUND - 70, text: '+1', color: '#ca8a04', t: 0 }); pr.onSfx?.('coin') } })
       w.stumble = Math.max(0, w.stumble - dt)
       w.knock = Math.max(0, w.knock - dt * 2.5)
       w.atk = Math.max(0, w.atk - dt * 2.2)
@@ -135,7 +144,7 @@ export default function RunnerCanvas(p: Props) {
       w.pops.forEach(q => { q.t += dt; q.y -= 24 * dt })
       w.pops = w.pops.filter(q => q.t < 1.1)
 
-      draw(ctx, pr, w, assetsRef.current)
+      draw(ctx, pr, w, assetsRef.current, progRef.current)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -156,16 +165,18 @@ export default function RunnerCanvas(p: Props) {
   )
 }
 
-function draw(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets | null) {
+function draw(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets | null, P: ProgManifest | null) {
   const th = themeOf(p.stage)
   const sx = w.shake > 0 ? Math.sin(w.t * 90) * 3 * w.shake : 0
   ctx.save()
   ctx.translate(sx, 0)
-  const bgArt = A?.bg[th.bg]
-  if (bgArt) {
+  const tier = TIERS.find(t => t.tier === (p.tier ?? 1)) ?? TIERS[0]
+  const bgKey = isBossStage(p.stage) && tier.bossBg ? tier.bossBg : th.bg // 보스 스테이지는 단계별 전용 배경
+  const bgImg = A?.bg[bgKey]?.img ?? (P?.backgrounds[bgKey] ? peekImage(P.backgrounds[bgKey].src) : null) ?? A?.bg[th.bg]?.img
+  if (A && bgImg) {
     // 사용자 제작 배경(1104×674 → 캔버스와 같은 비율). 정지 그림이라 달리는 느낌은 도로 위 흐르는 점선으로 준다.
     ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(bgArt.img, -6, 0, W + 12, H)
+    ctx.drawImage(bgImg, -6, 0, W + 12, H)
     ctx.fillStyle = 'rgba(255,255,255,0.5)'
     for (let i = 0; i < 12; i++) { const x = ((i * 44 - (w.scroll % 44)) + 528) % 528 - 44; ctx.fillRect(x, H - 22, 24, 3) }
   } else {
@@ -202,11 +213,11 @@ function draw(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets
   })
   w.coins.forEach(c => { if (!c.got) { ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(c.x, c.y, 6, 0, 7); ctx.fill(); ctx.strokeStyle = '#a16207'; ctx.stroke() } })
   // 몬스터
-  if (A) drawEnemyArt(ctx, 270, GROUND, p, w, A)
+  if (A) drawEnemyArt(ctx, 270, GROUND, p, w, A, P)
   else drawMonster(ctx, 270, GROUND, p, w)
   // 플레이어
   const lunge = w.atk > 0 ? Math.sin((1 - w.atk) * Math.PI) * 60 : 0
-  if (A) drawHeroArt(ctx, 70 + lunge - w.knock * 16, GROUND - w.py, p, w, A)
+  if (A) drawHeroArt(ctx, 70 + lunge - w.knock * 16, GROUND - w.py, p, w, A, P)
   else drawPlayer(ctx, 70 + lunge - w.knock * 16, GROUND - w.py, p.phase === 'running', w)
   // 슬래시
   if (w.atk > 0.2) {
@@ -235,7 +246,7 @@ function draw(ctx: CanvasRenderingContext2D, p: Props, w: World, A: HunterAssets
 export type World = {
   scroll: number; t: number; runT: number; arrived: boolean; lastPhase: RunPhase | ''
   py: number; vy: number; crit: boolean; knock: number; stumble: number; atk: number; hurt: number; mHit: number; mLunge: number; shake: number
-  obs: Obs[]; coins: Coin[]; pops: Pop[]; lastFlash: number
+  obs: Obs[]; coins: Coin[]; pops: Pop[]; lastFlash: number; gatePlayed: boolean
 }
 
 /** 글자를 maxW 안에 맞춘다: 글자 크기를 줄이다가 그래도 넘치면 말줄임. */
@@ -288,36 +299,91 @@ function drawArtGate(ctx: CanvasRenderingContext2D, cx: number, g: GateArt, disp
   ctx.restore()
 }
 
-function drawHeroArt(ctx: CanvasRenderingContext2D, x: number, y: number, p: Props, w: World, A: HunterAssets) {
-  const hero = A.hero[p.hero ?? 'male']
-  const pose = w.atk > 0.05 ? 'attack' : p.phase === 'running' ? 'run' : 'idle'
+/** 따라다니는 펫: 헌터 뒤에서 통통 따라온다. floatY 가 있는 펫(부엉이·까마귀 등)은 공중에 띄운다. */
+function drawPet(ctx: CanvasRenderingContext2D, x: number, y: number, p: Props, w: World, P: ProgManifest | null) {
+  const def = p.pet ? P?.pets[p.pet] : undefined
+  const img = def ? peekImage(def.src) : null
+  if (!def || !img) return
+  const h = H * def.heightInViewport
+  const wd = h * img.naturalWidth / img.naturalHeight
+  const hop = p.phase === 'running' ? Math.abs(Math.sin(w.t * 10 + 1)) * 4 : Math.sin(w.t * 2) * 1
+  const float = (def.floatY ?? 0) * H + (def.floatY ? Math.sin(w.t * 3) * 3 : 0)
+  ctx.drawImage(img, x - wd * def.anchor.x, y - float - hop - h * def.anchor.y, wd, h)
+}
+
+function drawHeroArt(ctx: CanvasRenderingContext2D, x: number, y: number, p: Props, w: World, A: HunterAssets, P: ProgManifest | null) {
+  const heroKey = p.hero ?? 'male'
+  const tier = TIERS.find(t => t.tier === (p.tier ?? 1)) ?? TIERS[0]
+  const attacking = w.atk > 0.05
+  const running = p.phase === 'running'
+  const bob = running && w.py === 0 ? Math.abs(Math.sin(w.t * 12)) * 3 : 0
+  // 펫은 헌터 뒤(왼쪽)에 먼저 그린다
+  drawPet(ctx, x - 44, y, p, w, P)
+
+  // 정예/전설 헌터 + 무기(손잡이 좌표에 맞춰 그린다). 그림이 아직 안 불러와졌으면 기본 헌터로 대체.
+  if (tier.heroSet !== 'starter' && P) {
+    const def = P.characters[`${heroKey}-${tier.heroSet}-${attacking ? 'attack' : 'ready'}`]
+    const img = def ? peekImage(def.src) : null
+    if (def && img) {
+      const h = H * def.heightInViewport
+      const wd = h * img.naturalWidth / img.naturalHeight
+      const left = x - wd * def.anchor.x, top = y - bob - h * def.anchor.y
+      const weapon = tier.weapon ? P.weapons[tier.weapon] : undefined
+      const wImg = weapon ? peekImage(weapon.src) : null
+      ctx.save()
+      if (w.hurt > 0 && Math.floor(w.t * 20) % 2 === 0) ctx.globalAlpha = 0.45
+      if (running) { ctx.translate(x, y); ctx.rotate(0.05); ctx.translate(-x, -y) } // 달리기 프레임이 없어 살짝 앞으로 기울인다
+      if (weapon && wImg) {
+        const ww = h * weapon.widthInHunterHeights
+        const wh = ww * wImg.naturalHeight / wImg.naturalWidth
+        const hx = left + wd * def.handGrip.x, hy = top + h * def.handGrip.y
+        ctx.save()
+        ctx.translate(hx, hy)
+        ctx.rotate(attacking ? -0.45 + (1 - w.atk) * 0.7 : -0.12) // 손잡이를 축으로 휘두른다
+        ctx.drawImage(wImg, -ww * weapon.grip.x, -wh * weapon.grip.y, ww, wh)
+        ctx.restore()
+      }
+      ctx.drawImage(img, left, top, wd, h) // 주먹이 손잡이를 가리도록 무기 위에 헌터를 그린다
+      ctx.restore()
+      return
+    }
+  }
+
+  const hero = A.hero[heroKey]
+  const pose = attacking ? 'attack' : running ? 'run' : 'idle'
   const img = hero.poses[pose]
   const h = H * hero.height
   const wd = h * img.naturalWidth / img.naturalHeight
-  const bob = p.phase === 'running' && w.py === 0 ? Math.abs(Math.sin(w.t * 12)) * 3 : 0
   ctx.save()
   if (w.hurt > 0 && Math.floor(w.t * 20) % 2 === 0) ctx.globalAlpha = 0.45
   ctx.drawImage(img, x - wd * hero.anchor.x, y - bob - h * hero.anchor.y, wd, h)
   ctx.restore()
 }
 
-function drawEnemyArt(ctx: CanvasRenderingContext2D, x: number, y: number, p: Props, w: World, A: HunterAssets) {
-  const e = A.enemies[enemyKeyFor(p.stage)]
-  if (!e) return drawMonster(ctx, x, y, p, w)
-  const h = H * e.height
-  const wd = h * e.img.naturalWidth / e.img.naturalHeight
+function drawEnemyArt(ctx: CanvasRenderingContext2D, x: number, y: number, p: Props, w: World, A: HunterAssets, P: ProgManifest | null) {
+  const key = bossForm(enemyKeyFor(p.stage, p.tier ?? 1), p.monsterHp, p.monsterMax)
+  // 상위 보스(성장 팩)는 progression manifest, 기본 몬스터/잉크 보스는 기본 팩
+  let img: HTMLImageElement | null = null
+  let height = 0, ax = 0.5, ay = 0.9625, floatY = 0
+  const boss = P?.bosses[key]
+  if (boss) { img = peekImage(boss.src); height = boss.heightInViewport; ax = boss.anchor.x; ay = boss.anchor.y }
+  else { const e = A.enemies[key]; if (e) { img = e.img; height = e.height; ax = e.anchor.x; ay = e.anchor.y; floatY = e.floatY ?? 0 } }
+  if (!img) { const e = A.enemies['inkBoss'] ?? A.enemies['inkSlime']; if (!e) return drawMonster(ctx, x, y, p, w); img = e.img; height = e.height; ax = e.anchor.x; ay = e.anchor.y }
+  const h = H * height
+  const wd = h * img.naturalWidth / img.naturalHeight
   const lunge = w.mLunge > 0 ? -Math.sin((1 - w.mLunge) * Math.PI) * 70 : 0
-  const float = (e.floatY ?? 0) * H + (e.floatY ? Math.sin(w.t * 3) * 3 : 0)
+  const float = floatY * H + (floatY ? Math.sin(w.t * 3) * 3 : 0)
   const shake = w.mHit > 0 ? Math.sin(w.t * 80) * 3 * w.mHit : 0
   ctx.save()
   if (p.monsterHp <= 0 && p.phase !== 'running') ctx.globalAlpha = 0.35
   else if (w.mHit > 0 && Math.floor(w.t * 30) % 2 === 0) ctx.globalAlpha = 0.6
-  const top = y - float - h * e.anchor.y
-  ctx.drawImage(e.img, x + lunge + shake - wd * e.anchor.x, top, wd, h)
+  const top = y - float - h * ay
+  ctx.drawImage(img, x + lunge + shake - wd * ax, top, wd, h)
   ctx.globalAlpha = 1
-  // HP 바
-  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x - 30, top - 12, 60, 8)
-  ctx.fillStyle = '#ef4444'; ctx.fillRect(x - 30, top - 12, 60 * Math.max(0, p.monsterHp) / p.monsterMax, 8)
+  // HP 바(보스는 더 넓게)
+  const bw = isBossStage(p.stage) ? 90 : 60
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x - bw / 2, Math.max(4, top - 12), bw, 8)
+  ctx.fillStyle = '#ef4444'; ctx.fillRect(x - bw / 2, Math.max(4, top - 12), bw * Math.max(0, p.monsterHp) / p.monsterMax, 8)
   ctx.restore()
 }
 
