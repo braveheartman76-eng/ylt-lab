@@ -50,3 +50,7 @@ __pycache__/
 /public/game-data/questions.local.json
 
 # game-content/questions.json 은 비공개 문제 원본(검수 전). 저장소가 공개되면 노출되므로 공개 전 반드시 제외할 것.
+
+# 학생 테스트 패키지 빌드 산출물
+/dist/
+/.student-build/

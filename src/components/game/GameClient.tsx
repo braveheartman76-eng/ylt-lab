@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import RunnerCanvas, { type Flash, type RunPhase } from './RunnerCanvas'
 import { applyAttempt, isDue, isOpenWrong, levelFromXp, CLEAR_STREAK } from '@/game/engine/srs'
 import { pickNext, type PickKind } from '@/game/engine/picker'
-import { recommend, unitStats } from '@/game/engine/stats'
+import { recommend, testSummary, unitStats } from '@/game/engine/stats'
 import type { Attempt, GameQuestion } from '@/game/engine/types'
 import { emptyGame, loadGame, saveGame, type SavedGame } from '@/game/store'
 import { speak, stopSpeaking, ttsSupported, unlockTts, readable } from '@/game/tts'
@@ -309,6 +309,19 @@ export default function GameClient() {
     if (r.lives) { playSfx('life'); setToast(`❤ 생명 +${r.lives} (간식 점수 보너스!)`) }
   }
 
+  // 학생 테스트 결과 복사(선생님께 붙여넣어 보내기). 개인 정보는 포함하지 않는다.
+  const [copied, setCopied] = useState<'ok' | 'fail' | null>(null)
+  const copyReport = async () => {
+    const text = JSON.stringify(testSummary(game, questions, { level: lv.level, tier: tier.tier, device: navigator.userAgent.slice(0, 120) }), null, 1)
+    try { await navigator.clipboard.writeText(text); setCopied('ok') }
+    catch {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select()
+      try { setCopied(document.execCommand('copy') ? 'ok' : 'fail') } catch { setCopied('fail') }
+      ta.remove()
+    }
+    window.setTimeout(() => setCopied(null), 3000)
+  }
+
   const stats = useMemo(() => unitStats(game.attempts, questions, game.schedules), [game.attempts, questions, game.schedules])
   const advice = useMemo(() => recommend(stats), [stats])
   const total = game.attempts.length
@@ -323,7 +336,7 @@ export default function GameClient() {
     // 게임은 SiteChrome 이 사이트 헤더/사이드바를 그리지 않으므로(모바일 폭 확보) 본문 전체를 쓴다.
     <div className="min-h-full bg-[#eef3f8]">
     <div className="mx-auto max-w-xl p-3 pb-10 select-none">
-      <Link href="/" className="mb-1 inline-block text-[11px] text-gray-500 underline">← 연구실 사이트로</Link>
+      {process.env.NEXT_PUBLIC_STUDENT !== '1' && <Link href="/" className="mb-1 inline-block text-[11px] text-gray-500 underline">← 연구실 사이트로</Link>}
       <header className="mb-2 flex items-center justify-between rounded-xl bg-white px-3 py-2 shadow-sm">
         <div>
           <div className="text-sm font-bold">노량진 형사법 헌터</div>
@@ -575,6 +588,13 @@ export default function GameClient() {
               return <div key={i.id} className={`rounded-lg border p-2 ${has ? 'bg-yellow-50' : 'bg-gray-50 opacity-40'}`} title={i.name}>
                 <div className="text-2xl">{has ? i.emoji : '❔'}</div><div className="text-[10px]">{has ? i.name : '???'}</div></div>
             })}
+          </div>
+          <div className="mt-4 rounded-lg bg-indigo-50 p-3 text-[12px] text-indigo-900">
+            <div className="font-bold">📝 테스트 참여</div>
+            <p className="mt-1">플레이가 끝나면 아래 버튼을 눌러 결과를 복사한 뒤 선생님께 붙여넣어 보내 주세요. (이름 등 개인정보는 들어 있지 않아요)</p>
+            <button onClick={copyReport} className="mt-2 w-full rounded-lg bg-indigo-600 py-2 font-bold text-white">테스트 결과 복사하기</button>
+            {copied === 'ok' && <div className="mt-1 text-center font-bold text-green-700">복사됐어요! 메시지에 붙여넣기(길게 누르기) 해 주세요.</div>}
+            {copied === 'fail' && <div className="mt-1 text-center font-bold text-rose-700">복사에 실패했어요. 화면을 캡처해서 보내 주세요.</div>}
           </div>
           <button className="mt-4 text-[11px] text-gray-400 underline" onClick={() => { if (confirm('이 기기에 저장된 게임 기록을 모두 지울까요? (되돌릴 수 없음)')) { setGame(emptyGame()); setPhase('idle'); setCurrent(null) } }}>이 기기 기록 초기화</button>
         </section>

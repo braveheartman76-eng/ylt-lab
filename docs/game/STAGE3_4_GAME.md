@@ -119,3 +119,13 @@
   체력은 저장되며, 오답마다 -1, 0이 되면 게임오버 없이 기본 체력(3)으로 재정비. 점수·생명은 학습 보상(XP/코인 규칙)과 별개의 재미 요소다.
 - 테스트: 파트 묶기/선택, 점수→생명(상한/가득 시 코인/여러 개), 달리기 프레임 파일·크기·보정값. 실제 브라우저에서 한 문제씩(9초 대기 후에도 유지 → 버튼 클릭 시 달림, 해설 전체 낭독),
   한 파트씩(6문제 파트 자동진행 → 결과 화면, 오답 표시 2/해설 6), 점수(38점→40점 시 체력 3→4)를 확인.
+
+---
+
+## 학생 테스트 패키지
+- 만들기: `npm run build:student` → `dist/noryangjin-hunter-student-test.zip` (게임만 정적 빌드, 약 17MB, 서버/로그인/DB 불필요). 스크립트 `scripts/build-student-pack.mjs`, 동봉 파일 `scripts/student-pack/`.
+- 구성: `site/`(게임 본체) + `README.txt`(실행 방법·학생 안내문·의견 질문) + `start-windows.bat`/`server.ps1`(설치 없이 PC에서 실행) + `start-mac.command`.
+- 배포: `site/` 폴더를 정적 호스팅(Netlify Drop, Vercel, Cloudflare Pages 등)의 **사이트 맨 위 주소**에 올리면 학생 폰에서 링크로 열린다(하위 폴더 주소 불가).
+- 학생 피드백: `내 방` 탭의 "테스트 결과 복사하기"(`testSummary`: 풀이 수·정답률·평균 풀이 시간·단원별 정답률·최근 오답·진행 방식·레벨/단계, 개인정보 없음)를 선생님께 붙여넣어 보낸다.
+- 검증: zip 을 풀어 정적 서버로 열어 문제 121개 로드, 4문제 풀이, 결과 복사(클립보드 JSON) 확인. **미검증**: `server.ps1`/`start-windows.bat`(이 환경에 PowerShell 이 없어 실행해 보지 못함), `start-mac.command`(macOS 없음).
+- 주의: 문제·정답이 `site/game-data/questions.local.json` 에 그대로 들어 있어 링크를 아는 사람은 누구나 볼 수 있다.

@@ -120,3 +120,17 @@ test('평소에도 미처리 오답이 꾸준히 섞여 나온다 (약 1/3 이�
   for (let i = 0; i < 400; i++) if (pickNext(qs, sch, { now: 1000, attempts: [], rng })?.kind === 'critical') hit++
   assert.ok(hit / 400 > 0.3 && hit / 400 < 0.5, `critical 비율 ${hit / 400}`)
 })
+
+test('학생 테스트 결과 요약: 정답률/오답 목록/단원별 집계, 개인정보 필드 없음', async () => {
+  const { testSummary } = await import('../../src/game/engine/stats.ts')
+  const qs = [mkQ('a'), mkQ('b', 'u2')]
+  const attempts = [mkA('a', true, { elapsedMs: 2000 }), mkA('a', false, { elapsedMs: 4000 }), mkA('b', false, { unitId: 'u2', elapsedMs: 6000 })]
+  const schedules: Record<string, ScheduleState> = { a: applyAttempt(undefined, 'a', false, 0, null).state }
+  const r = testSummary({ mode: 'part', xp: 0, stage: 2, score: 17, hp: 3, attempts, schedules }, qs, { level: 3, tier: 2, device: 'test', at: '2026-01-01T00:00:00Z' })
+  assert.equal(r.attempts, 3); assert.equal(r.accuracy, 33.3); assert.equal(r.avgSeconds, 4)
+  assert.equal(r.recentWrong.length, 2); assert.equal(r.openWrong, 1); assert.equal(r.mode, 'part')
+  assert.ok(r.byUnit.length === 2)
+  assert.deepEqual(Object.keys(r).filter(k => /name|email|user|id$/i.test(k)), [])
+  const empty = testSummary({ mode: 'single', xp: 0, stage: 1, score: 0, hp: 3, attempts: [], schedules: {} }, qs, { level: 1, tier: 1 })
+  assert.equal(empty.accuracy, null)
+})

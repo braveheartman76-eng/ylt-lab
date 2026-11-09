@@ -61,3 +61,34 @@ export function recommend(stats: UnitStat[], minAttempts = 5): string | null {
   const label = weak.s.reviewAccuracy != null ? '복습 정답률' : '정답률'
   return `「${weak.s.unitTitle}」 단원의 ${label}이 ${Math.round(weak.rate * 100)}%입니다. 오늘은 이 단원의 10문항 집중훈련을 추천합니다.`
 }
+
+/** 학생 테스트 결과 요약(선생님께 보낼 내용). 개인 식별 정보는 넣지 않는다. */
+export function testSummary(
+  g: { mode: string; xp: number; stage: number; score: number; hp: number; attempts: Attempt[]; schedules: Record<string, ScheduleState> },
+  questions: GameQuestion[],
+  extra: { level: number; tier: number; device?: string; at?: string },
+) {
+  const byId = new Map(questions.map(q => [q.id, q]))
+  const total = g.attempts.length
+  const correct = g.attempts.filter(a => a.isCorrect).length
+  const wrongRows = g.attempts.filter(a => !a.isCorrect).slice(-30).map(a => {
+    const q = byId.get(a.questionId)
+    return { id: a.questionId, unit: q?.topic ?? q?.unitTitle ?? '', statement: (q?.statement ?? '').slice(0, 60), selected: a.selected, answer: q?.answer ?? '' }
+  })
+  return {
+    app: 'noryangjin-hunter-test',
+    exportedAt: extra.at ?? new Date().toISOString(),
+    device: extra.device ?? '',
+    mode: g.mode,
+    level: extra.level,
+    tier: extra.tier,
+    stage: g.stage,
+    score: g.score,
+    attempts: total,
+    accuracy: total ? Math.round((correct / total) * 1000) / 10 : null,
+    avgSeconds: total ? Math.round(g.attempts.reduce((s, a) => s + a.elapsedMs, 0) / total / 100) / 10 : null,
+    openWrong: Object.values(g.schedules).filter(isOpenWrong).length,
+    byUnit: unitStats(g.attempts, questions, g.schedules).filter(u => u.attempts > 0).map(u => ({ unit: u.unitTitle, attempts: u.attempts, accuracy: u.accuracy === null ? null : Math.round(u.accuracy * 100) })),
+    recentWrong: wrongRows,
+  }
+}
