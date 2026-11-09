@@ -1,9 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
 import './globals.css'
-import Header from '@/components/Header'
-import Sidebar from '@/components/Sidebar'
-import FloatingButtons from '@/components/FloatingButtons'
+import SiteChrome from '@/components/SiteChrome'
 import { AuthProvider } from '@/lib/auth-context'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
@@ -18,14 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ko" className={`${geist.variable} h-full`}>
       <body className="h-full flex flex-col antialiased bg-[#f5f7fa]">
         <AuthProvider>
-          <Header />
-          <div className="flex flex-1 overflow-hidden">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto">
-              {children}
-            </main>
-          </div>
-          <FloatingButtons />
+          <SiteChrome>{children}</SiteChrome>
         </AuthProvider>
       </body>
     </html>

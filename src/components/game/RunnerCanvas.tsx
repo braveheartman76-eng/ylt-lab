@@ -9,6 +9,7 @@ export interface Flash {
   kind: 'hit' | 'miss'
   nonce: number
   dmg?: string // 예: "+10 XP"
+  crit?: boolean // 크리티컬 공격(미처리 오답을 맞힘)
 }
 
 interface Props {
@@ -20,18 +21,20 @@ interface Props {
   flash: Flash | null
   runMs: number // 문제 지점까지 달리는 시간
   onArrive: () => void
-  speedLabel?: string
+  critical?: boolean // 미처리 오답 문항 = 불시 공격(붉은 경고 연출)
 }
 
 const W = 360
 const H = 220
 const GROUND = 168
+const RUN_SPEED = 120 // px/s (천천히: 모바일에서 반응할 시간 확보)
+const OBSTACLE_ENTER_S = 1 // 첫 장애물이 화면 오른쪽 끝에 나타나는 시각(달리기 시작 후)
 
 interface Pop { x: number; y: number; text: string; color: string; t: number }
 interface Obs { x: number; w: number; h: number; passed: boolean }
 interface Coin { x: number; y: number; got: boolean }
 
-/** 자동 이동 러닝 화면. 학습 로직과 분리된 순수 연출(캐릭터·몬스터는 임시 도안). 탭/스페이스로 점프. */
+/** 자동 이동 러닝 화면. 학습 로직과 분리된 순수 연출(캐릭터·몬스터는 임시 도안). 화면을 터치/스페이스로 점프. */
 export default function RunnerCanvas(p: Props) {
   const cv = useRef<HTMLCanvasElement>(null)
   const props = useRef(p)
@@ -39,7 +42,7 @@ export default function RunnerCanvas(p: Props) {
 
   const world = useRef<World>({
     scroll: 0, t: 0, runT: 0, arrived: false, lastPhase: '',
-    py: 0, vy: 0, stumble: 0, atk: 0, hurt: 0, mHit: 0, mLunge: 0, shake: 0,
+    py: 0, vy: 0, crit: false, stumble: 0, atk: 0, hurt: 0, mHit: 0, mLunge: 0, shake: 0,
     obs: [], coins: [], pops: [], lastFlash: -1,
   })
 
@@ -54,9 +57,15 @@ export default function RunnerCanvas(p: Props) {
     let last = performance.now()
     const w = world.current
 
-    const jump = () => { if (w.py === 0 && props.current.phase === 'running') w.vy = 7.2 }
+    // 화면 아무 곳이나 터치하면 점프(엄지로 누르기 쉽게). 버튼·링크·탭 영역은 제외. 스페이스바도 지원.
+    const jump = () => { if (w.py === 0 && w.vy === 0 && props.current.phase === 'running') w.vy = 7.2 }
+    const onPointer = (e: PointerEvent) => {
+      const t = e.target as Element | null
+      if (t?.closest('button, a, input, label, nav, [role="tab"]')) return
+      jump()
+    }
     const onKey = (e: KeyboardEvent) => { if (e.code === 'Space' && props.current.phase === 'running') { e.preventDefault(); jump() } }
-    canvas.addEventListener('pointerdown', jump)
+    window.addEventListener('pointerdown', onPointer)
     window.addEventListener('keydown', onKey)
 
     const loop = (now: number) => {
@@ -67,19 +76,21 @@ export default function RunnerCanvas(p: Props) {
       if (w.lastPhase !== pr.phase) {
         if (pr.phase === 'running') {
           w.runT = 0; w.arrived = false
-          w.obs = [{ x: W + 60, w: 22, h: 20, passed: false }, { x: W + 260, w: 26, h: 24, passed: false }]
+          // 장애물은 달리기 시작 후 1초 뒤에 화면에 들어온다(문제를 푼 직후엔 반응할 틈이 필요)
+          w.obs = [{ x: W + RUN_SPEED * OBSTACLE_ENTER_S, w: 22, h: 20, passed: false }]
           w.coins = [0, 1, 2, 3].map(i => ({ x: W + 40 + i * 70, y: GROUND - 46 - (i % 2) * 16, got: false }))
         }
         w.lastPhase = pr.phase
       }
       if (pr.flash && pr.flash.nonce !== w.lastFlash) {
         w.lastFlash = pr.flash.nonce
-        if (pr.flash.kind === 'hit') { w.atk = 1; w.mHit = 1 } else { w.mLunge = 1; w.hurt = 1; w.shake = 1 }
-        if (pr.flash.dmg) w.pops.push({ x: 250, y: 90, text: pr.flash.dmg, color: pr.flash.kind === 'hit' ? '#16a34a' : '#dc2626', t: 0 })
+        if (pr.flash.kind === 'hit') { w.atk = 1; w.mHit = 1; w.crit = !!pr.flash.crit } else { w.mLunge = 1; w.hurt = 1; w.shake = 1 }
+        if (pr.flash.crit) w.pops.push({ x: 200, y: 70, text: 'CRITICAL!', color: '#ea580c', t: 0 })
+        if (pr.flash.dmg) w.pops.push({ x: 250, y: 100, text: pr.flash.dmg, color: pr.flash.kind === 'hit' ? '#16a34a' : '#dc2626', t: 0 })
       }
       w.t += dt
       const running = pr.phase === 'running'
-      const speed = running ? (w.stumble > 0 ? 70 : 150) : 0
+      const speed = running ? (w.stumble > 0 ? RUN_SPEED * 0.5 : RUN_SPEED) : 0
       if (running) {
         w.scroll += speed * dt
         w.runT += dt * 1000
@@ -87,7 +98,7 @@ export default function RunnerCanvas(p: Props) {
         w.obs.forEach(o => { o.x -= speed * dt })
         w.coins.forEach(c => { c.x -= speed * dt })
       }
-      // 점프
+      // 점프 물리
       if (w.py > 0 || w.vy > 0) { w.py = Math.max(0, w.py + w.vy * 60 * dt); w.vy -= 24 * dt * 1.0; if (w.py === 0) w.vy = 0 }
       // 충돌/코인
       const px = 70
@@ -111,7 +122,7 @@ export default function RunnerCanvas(p: Props) {
     raf = requestAnimationFrame(loop)
     return () => {
       cancelAnimationFrame(raf)
-      canvas.removeEventListener('pointerdown', jump)
+      window.removeEventListener('pointerdown', onPointer)
       window.removeEventListener('keydown', onKey)
     }
   }, [])
@@ -120,7 +131,7 @@ export default function RunnerCanvas(p: Props) {
     <canvas
       ref={cv}
       style={{ width: '100%', aspectRatio: `${W} / ${H}`, display: 'block', borderRadius: 12, touchAction: 'manipulation' }}
-      aria-label="달리는 수험생 캐릭터 화면. 화면을 탭하면 점프합니다."
+      aria-label="달리는 수험생 캐릭터 화면. 화면을 터치하면 점프합니다."
     />
   )
 }
@@ -154,8 +165,8 @@ function draw(ctx: CanvasRenderingContext2D, p: Props, w: World) {
   drawPlayer(ctx, 70 + lunge, GROUND - w.py, p.phase === 'running', w)
   // 슬래시
   if (w.atk > 0.2) {
-    ctx.strokeStyle = `rgba(255,255,255,${w.atk})`; ctx.lineWidth = 5
-    ctx.beginPath(); ctx.arc(190, GROUND - 40, 46, -1.1, 0.7); ctx.stroke(); ctx.lineWidth = 1
+    ctx.strokeStyle = w.crit ? `rgba(251,146,60,${w.atk})` : `rgba(255,255,255,${w.atk})`; ctx.lineWidth = w.crit ? 10 : 5
+    ctx.beginPath(); ctx.arc(190, GROUND - 40, w.crit ? 62 : 46, -1.1, 0.7); ctx.stroke(); ctx.lineWidth = 1
   }
   // 팝업
   w.pops.forEach(q => { ctx.globalAlpha = Math.max(0, 1 - q.t / 1.1); ctx.fillStyle = q.color; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(q.text, q.x, q.y); ctx.globalAlpha = 1 })
@@ -165,11 +176,18 @@ function draw(ctx: CanvasRenderingContext2D, p: Props, w: World) {
   ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left'
   ctx.fillText(`STAGE ${p.stage} · ${th.name}`.slice(0, 14), 14, 23)
   for (let i = 0; i < 3; i++) { ctx.fillStyle = i < p.playerHp ? '#ef4444' : 'rgba(0,0,0,0.25)'; ctx.fillText('♥', 130 + i * 16, 24) }
-  if (p.phase === 'running') { ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(W - 128, 8, 120, 20); ctx.fillStyle = '#fff'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('탭하면 점프!', W - 68, 22) }
+  if (p.phase === 'running') { ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(W - 138, 8, 130, 20); ctx.fillStyle = '#fff'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('화면 터치 = 점프!', W - 73, 22) }
+  if (p.critical && (p.phase === 'running' || p.phase === 'question')) {
+    // 불시 공격: 붉은 테두리가 깜빡이고 경고 문구 표시
+    const a = 0.25 + 0.2 * Math.sin(w.t * 8)
+    ctx.strokeStyle = `rgba(220,38,38,${a + 0.3})`; ctx.lineWidth = 8; ctx.strokeRect(4, 4, W - 8, H - 8); ctx.lineWidth = 1
+    ctx.fillStyle = 'rgba(220,38,38,0.9)'; ctx.fillRect(W / 2 - 62, 34, 124, 22)
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚠ 불시 공격!', W / 2, 50)
+  }
 }
 export type World = {
   scroll: number; t: number; runT: number; arrived: boolean; lastPhase: RunPhase | ''
-  py: number; vy: number; stumble: number; atk: number; hurt: number; mHit: number; mLunge: number; shake: number
+  py: number; vy: number; crit: boolean; stumble: number; atk: number; hurt: number; mHit: number; mLunge: number; shake: number
   obs: Obs[]; coins: Coin[]; pops: Pop[]; lastFlash: number
 }
 

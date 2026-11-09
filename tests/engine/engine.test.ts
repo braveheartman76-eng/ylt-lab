@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { applyAttempt, INTERVAL_MINUTES, levelFromXp } from '../../src/game/engine/srs.ts'
+import { applyAttempt, INTERVAL_MINUTES, levelFromXp, isOpenWrong, CLEAR_STREAK } from '../../src/game/engine/srs.ts'
 import { pickNext, targetDifficulty } from '../../src/game/engine/picker.ts'
 import { recommend, unitStats } from '../../src/game/engine/stats.ts'
 import type { Attempt, GameQuestion, ScheduleState } from '../../src/game/engine/types.ts'
@@ -42,7 +42,7 @@ test('레벨은 경험치로만 오른다', () => {
   assert.equal(levelFromXp(0).level, 1); assert.equal(levelFromXp(50).level, 2); assert.ok(levelFromXp(10_000).level > 5)
 })
 
-test('출제: reviewOnly 는 복습 예정 문항만, 오답 많은 순', () => {
+test('출제: reviewOnly 는 미처리 오답(오답 많은 순) → 복습 예정 순, 없으면 null', () => {
   const qs = [mkQ('a'), mkQ('b'), mkQ('c')]
   const sch: Record<string, ScheduleState> = {
     a: { ...applyAttempt(undefined, 'a', false, 0, null).state },
@@ -50,7 +50,7 @@ test('출제: reviewOnly 는 복습 예정 문항만, 오답 많은 순', () => 
   }
   const now = 3 * DAY
   const p = pickNext(qs, sch, { now, attempts: [], reviewOnly: true })
-  assert.equal(p?.question.id, 'b'); assert.equal(p?.kind, 'review')
+  assert.equal(p?.question.id, 'b'); assert.equal(p?.kind, 'critical')
   assert.equal(pickNext(qs, {}, { now, attempts: [], reviewOnly: true }), null)
 })
 
@@ -81,4 +81,42 @@ test('통계/추천: 근거가 충분할 때만 취약 단원 추천, 합격 가
   const msg = recommend(unitStats(at, qs, {}))!
   assert.match(msg, /\[테스트\] 단원1.*복습 정답률이 0%/)
   assert.doesNotMatch(msg, /합격/)
+})
+
+test('미처리 오답: 연속 2회 정답으로 처리되고, 다시 틀리면 되살아난다 (누적 오답은 유지)', () => {
+  let s = applyAttempt(undefined, 'a', false, 0, null).state
+  assert.equal(isOpenWrong(s), true)
+  s = applyAttempt(s, 'a', true, 1000, null).state
+  assert.equal(isOpenWrong(s), true, `연속 ${CLEAR_STREAK}회 전에는 미처리`)
+  s = applyAttempt(s, 'a', true, 2000, null).state
+  assert.equal(isOpenWrong(s), false)
+  s = applyAttempt(s, 'a', false, 3000, null).state
+  assert.equal(isOpenWrong(s), true)
+  assert.equal(s.wrongCount, 2)
+  assert.equal(isOpenWrong(undefined), false)
+})
+
+test('미처리 오답은 복습 시각이 아직 안 되었어도 접속하면 먼저 나온다(forceCritical)', () => {
+  const qs = [mkQ('wrong1'), mkQ('fresh1'), mkQ('fresh2')]
+  const sch = { wrong1: applyAttempt(undefined, 'wrong1', false, 0, null).state }
+  const now = 1000 // 30분 복습 시각 전
+  assert.ok(sch.wrong1.nextReviewAt > now)
+  const p = pickNext(qs, sch, { now, attempts: [], forceCritical: true, rng: () => 0.99 })
+  assert.equal(p?.question.id, 'wrong1'); assert.equal(p?.kind, 'critical')
+  // 처리된 뒤에는 접속 직후에도 강제로 나오지 않는다
+  let s = sch.wrong1
+  s = applyAttempt(s, 'wrong1', true, 2000, null).state
+  s = applyAttempt(s, 'wrong1', true, 3000, null).state
+  const p2 = pickNext(qs, { wrong1: s }, { now: 4000, attempts: [], forceCritical: true, rng: () => 0.99, recentIds: [] })
+  assert.notEqual(p2?.kind, 'critical')
+})
+
+test('평소에도 미처리 오답이 꾸준히 섞여 나온다 (약 1/3 이상)', () => {
+  const qs = [mkQ('w'), ...Array.from({ length: 20 }, (_, i) => mkQ(`n${i}`))]
+  const sch = { w: applyAttempt(undefined, 'w', false, 0, null).state }
+  let seed = 7
+  const rng = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32
+  let hit = 0
+  for (let i = 0; i < 400; i++) if (pickNext(qs, sch, { now: 1000, attempts: [], rng })?.kind === 'critical') hit++
+  assert.ok(hit / 400 > 0.3 && hit / 400 < 0.5, `critical 비율 ${hit / 400}`)
 })

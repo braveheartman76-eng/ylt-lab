@@ -1,4 +1,5 @@
 import type { Attempt, GameQuestion, ScheduleState } from './types.ts'
+import { isOpenWrong } from './srs.ts'
 
 export interface UnitStat {
   unitId: string
@@ -8,7 +9,7 @@ export interface UnitStat {
   firstAccuracy: number | null // 첫 풀이 정답률
   reviewAccuracy: number | null // 복습 정답률
   avgElapsedMs: number | null
-  openWrong: number // 아직 숙련 전(box<3) 인 오답 이력 문항 수
+  openWrong: number // 미처리 오답 문항 수(연속 2회 정답 전)
 }
 
 const ratio = (a: number, b: number) => (b === 0 ? null : a / b)
@@ -37,7 +38,7 @@ export function unitStats(
       firstAccuracy: ratio(first.filter(x => x.isCorrect).length, first.length),
       reviewAccuracy: ratio(rev.filter(x => x.isCorrect).length, rev.length),
       avgElapsedMs: a.length ? a.reduce((s, x) => s + x.elapsedMs, 0) / a.length : null,
-      openWrong: [...u.ids].filter(id => (schedules[id]?.wrongCount ?? 0) > 0 && (schedules[id]?.box ?? 0) < 3).length,
+      openWrong: [...u.ids].filter(id => isOpenWrong(schedules[id])).length,
     })
   }
   return out

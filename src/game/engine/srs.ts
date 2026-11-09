@@ -54,6 +54,12 @@ export function computeReward(isCorrect: boolean, isFirst: boolean, wasReview: b
   return { xp: 10 + 5 * (d - 1) + (wasReview ? 5 : 0), coins: 2 + d }
 }
 
+/** 오답 '처리 완료'에 필요한 연속 정답 수. 이 횟수만큼 연속으로 맞히기 전까지는 미처리 오답으로 계속 출제된다. */
+export const CLEAR_STREAK = 2
+
+/** 미처리 오답: 한 번이라도 틀린 적이 있고 아직 연속 CLEAR_STREAK 회 맞히지 못한 문항. 복습 시각과 무관하게 접속할 때마다 나온다. */
+export const isOpenWrong = (s: ScheduleState | undefined) => !!s && s.wrongCount > 0 && s.streak < CLEAR_STREAK
+
 export const isDue = (s: ScheduleState, now: number) => s.nextReviewAt <= now
 
 /** 게임 레벨: 경험치 기준(게임 성장). 학습 숙련도와는 별개다. */

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import RunnerCanvas, { type Flash, type RunPhase } from './RunnerCanvas'
-import { applyAttempt, isDue, levelFromXp } from '@/game/engine/srs'
+import { applyAttempt, isDue, isOpenWrong, levelFromXp, CLEAR_STREAK } from '@/game/engine/srs'
 import { pickNext, type PickKind } from '@/game/engine/picker'
 import { recommend, unitStats } from '@/game/engine/stats'
 import type { Attempt, GameQuestion } from '@/game/engine/types'
@@ -12,7 +12,7 @@ import { speak, stopSpeaking, ttsSupported, unlockTts, readable } from '@/game/t
 import { ITEMS, MAX_PLAYER_HP, STAGE_SIZE, dropFor, isBossStage, roomName, themeOf } from '@/game/world'
 
 type Tab = 'play' | 'review' | 'report' | 'room'
-const KIND_LABEL: Record<PickKind, string> = { review: '복습', new: '새 문제', past_wrong: '오답 다시', challenge: '도전', any: '장기 확인' }
+const KIND_LABEL: Record<PickKind, string> = { critical: '⚠ 불시 공격 · 미처리 오답', review: '복습', new: '새 문제', challenge: '도전', any: '장기 확인' }
 
 interface Feedback {
   correct: boolean
@@ -23,6 +23,7 @@ interface Feedback {
   nextText: string
   drop?: string
   cleared?: boolean
+  crit?: boolean
 }
 
 export default function GameClient() {
@@ -42,6 +43,7 @@ export default function GameClient() {
   const [startedAt, setStartedAt] = useState(0)
   const [now, setNow] = useState(() => Date.now())
   const [recent, setRecent] = useState<string[]>([])
+  const [served, setServed] = useState(0) // 이번 접속에서 출제한 수(처음 몇 문제는 미처리 오답을 먼저 낸다)
 
   // 저장된 진행 + 문제 데이터 불러오기 (로컬 모드)
   useEffect(() => {
@@ -66,18 +68,21 @@ export default function GameClient() {
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(id) }, [])
 
   const dueCount = useMemo(() => questions.filter(q => game.schedules[q.id] && isDue(game.schedules[q.id], now)).length, [questions, game.schedules, now])
+  const openCount = useMemo(() => questions.filter(q => isOpenWrong(game.schedules[q.id])).length, [questions, game.schedules])
   const lv = levelFromXp(game.xp)
   const th = themeOf(game.stage)
 
   const nextRun = useCallback((o?: { review: boolean; unit?: string }) => {
     const ro = o ? o.review : reviewOnly
     const unit = o ? o.unit : focusUnit
-    const p = pickNext(questions, game.schedules, { now: Date.now(), attempts: game.attempts, recentIds: recent, reviewOnly: ro, unitId: unit })
+    const sv = o ? 0 : served // start 로 새로 접속한 경우 0부터
+    const p = pickNext(questions, game.schedules, { now: Date.now(), attempts: game.attempts, recentIds: recent, reviewOnly: ro, unitId: unit, forceCritical: sv < 3 })
     if (!p) { setCurrent(null); setPhase('idle'); return }
+    setServed(sv + 1)
     setCurrent({ q: p.question, kind: p.kind })
     setFeedback(null)
     setPhase('running')
-  }, [questions, game.schedules, game.attempts, recent, reviewOnly, focusUnit])
+  }, [questions, game.schedules, game.attempts, recent, reviewOnly, focusUnit, served])
 
   const arrive = useCallback(() => {
     setPhase('question')
@@ -102,7 +107,7 @@ export default function GameClient() {
     let kills = g.stageKills, items = g.items, coins = g.coins + r.reward.coins
     let hp = playerHp, mhp = monsterHp, drop: string | undefined, cleared = false
     if (correct) {
-      mhp = monsterHp - 1
+      mhp = monsterHp - (current.kind === 'critical' ? 2 : 1) // 크리티컬(미처리 오답을 맞힘)은 2배 피해
       kills += 1
       if (mhp <= 0) {
         const it = dropFor(stage, items)
@@ -117,14 +122,16 @@ export default function GameClient() {
     if (cleared) { next.stage = stage + 1; next.stageKills = 0 }
     setGame(next)
     setNow(t)
-    setFlash({ kind: correct ? 'hit' : 'miss', nonce: t, dmg: correct ? (r.reward.xp ? `+${r.reward.xp} XP` : '정답!') : '오답…' })
+    setFlash({ kind: correct ? 'hit' : 'miss', nonce: t, crit: correct && current.kind === 'critical', dmg: correct ? (r.reward.xp ? `+${r.reward.xp} XP` : '정답!') : '오답…' })
     setMonsterHp(cleared ? STAGE_SIZE : mhp)
     setPlayerHp(hp <= 0 ? MAX_PLAYER_HP : hp)
     setRecent(r => [q.id, ...r].slice(0, 3))
     const mins = Math.round((r.state.nextReviewAt - t) / 60000)
-    const nextText = mins < 120 ? `${mins}분 뒤 다시 확인해요` : mins < 2880 ? '내일 다시 나와요' : `${Math.round(mins / 1440)}일 뒤 다시 나와요`
+    const wasOpen = isOpenWrong(g.schedules[q.id])
+    const nowOpen = isOpenWrong(r.state)
+    const baseText = mins < 120 ? `${mins}분 뒤 다시 확인해요` : mins < 2880 ? '내일 다시 나와요' : `${Math.round(mins / 1440)}일 뒤 다시 나와요`
     const exp = q.explanation ?? ''
-    const fb: Feedback = { correct, answer: q.type === 'ox' ? q.answer : `${q.answer}번`, explanation: exp, xp: r.reward.xp, coins: r.reward.coins, nextText: correct ? nextText : `오답노트에 저장 · ${nextText}`, drop, cleared }
+    const fb: Feedback = { correct, answer: q.type === 'ox' ? q.answer : `${q.answer}번`, explanation: exp, xp: r.reward.xp, coins: r.reward.coins, nextText: nowOpen ? `미처리 오답 · 연속 정답 ${r.state.streak}/${CLEAR_STREAK} — 처리될 때까지 접속할 때마다 나와요` : wasOpen ? `오답 처리 완료! · ${baseText}` : baseText, drop, cleared, crit: correct && current.kind === 'critical' }
     setFeedback(fb)
     setPhase('feedback')
     speak(`${correct ? '정답입니다.' : `오답입니다. 정답은 ${fb.answer}.`} ${readable(exp.split('\n')[0] ?? '')}`, g.tts)
@@ -165,12 +172,12 @@ export default function GameClient() {
   const firstA = game.attempts.filter(a => a.isFirst)
   const wrongDocs = Object.values(game.schedules).filter(s => s.wrongCount > 0).length
 
-  if (!loaded) return <div className="fixed inset-0 z-[100] bg-[#eef3f8] p-6 text-sm text-gray-500">불러오는 중…</div>
+  if (!loaded) return <div className="min-h-full bg-[#eef3f8] p-6 text-sm text-gray-500">불러오는 중…</div>
 
   const q = current?.q
   return (
-    // 게임은 기존 사이트의 헤더/사이드바 없이 전체 화면으로 표시한다(모바일 폭 확보). 기존 레이아웃은 수정하지 않는다.
-    <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#eef3f8]">
+    // 게임은 SiteChrome 이 사이트 헤더/사이드바를 그리지 않으므로(모바일 폭 확보) 본문 전체를 쓴다.
+    <div className="min-h-full bg-[#eef3f8]">
     <div className="mx-auto max-w-xl p-3 pb-10 select-none">
       <Link href="/" className="mb-1 inline-block text-[11px] text-gray-500 underline">← 연구실 사이트로</Link>
       <header className="mb-2 flex items-center justify-between rounded-xl bg-white px-3 py-2 shadow-sm">
@@ -180,12 +187,12 @@ export default function GameClient() {
         </div>
         <div className="text-right text-xs">
           <div className="font-bold text-blue-700">Lv.{lv.level} <span className="text-gray-400">({lv.into}/{lv.need})</span></div>
-          <div>🪙 {game.coins} · 오늘 복습 {dueCount}</div>
+          <div>🪙 {game.coins} · 미처리 오답 <b className={openCount ? 'text-rose-600' : ''}>{openCount}</b></div>
         </div>
       </header>
 
       <nav className="mb-2 grid grid-cols-4 gap-1 text-sm" role="tablist">
-        {([['play', '게임'], ['review', `복습${dueCount ? ` ${dueCount}` : ''}`], ['report', '리포트'], ['room', '내 방']] as [Tab, string][]).map(([k, label]) => (
+        {([['play', '게임'], ['review', `오답${openCount ? ` ${openCount}` : ''}`], ['report', '리포트'], ['room', '내 방']] as [Tab, string][]).map(([k, label]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
             className={`rounded-lg py-2 font-medium ${tab === k ? 'bg-blue-600 text-white' : 'bg-white text-gray-700'}`}>{label}</button>
         ))}
@@ -195,11 +202,12 @@ export default function GameClient() {
         <section>
           <div className="relative">
             <RunnerCanvas phase={phase} stage={game.stage} monsterHp={monsterHp} monsterMax={STAGE_SIZE} playerHp={playerHp} flash={flash}
-              runMs={2200} onArrive={arrive} />
+              runMs={3800} onArrive={arrive} critical={current?.kind === 'critical' && (phase === 'running' || phase === 'question')} />
             {phase === 'idle' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-black/45 p-4 text-center text-white">
                 <div className="text-lg font-bold">노량진역에 도착했습니다</div>
                 <div className="text-xs">STAGE {game.stage} · {th.name}{isBossStage(game.stage) ? ' · 보스' : ''}</div>
+                {openCount > 0 && <div className="rounded bg-rose-600/90 px-3 py-1 text-xs font-bold">⚠ 미처리 오답 {openCount}개가 불시 공격으로 먼저 나옵니다</div>}
                 {questions.length ? (
                   <button onClick={() => start({})} className="mt-1 rounded-full bg-yellow-400 px-6 py-3 text-base font-bold text-black">공부 시작</button>
                 ) : <div className="text-sm">문제 데이터가 없습니다 (public/game-data)</div>}
@@ -213,7 +221,7 @@ export default function GameClient() {
                 <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">{KIND_LABEL[current.kind]}</span>
                 <span>{q!.unitTitle}{q!.isTestData ? ' · 테스트' : ''}{q!.derivedFrom ? ' · 선지 변형' : ''}</span>
               </div>
-              {phase === 'running' && <div className="py-6 text-center text-sm text-gray-500">다음 문제로 달리는 중… (화면을 탭하면 점프)</div>}
+              {phase === 'running' && <div className="py-6 text-center text-sm text-gray-500">{current.kind === 'critical' ? '⚠ 불시 공격이 다가온다! ' : ''}다음 문제로 달리는 중… 화면을 터치하면 점프!</div>}
               {(phase === 'question' || phase === 'feedback') && (
                 <div>
                   <p className="whitespace-pre-wrap text-[15px] font-semibold leading-relaxed">{q!.statement}</p>
@@ -233,7 +241,7 @@ export default function GameClient() {
               )}
               {phase === 'feedback' && feedback && (
                 <div className={`mt-3 rounded-lg p-3 text-sm ${feedback.correct ? 'bg-green-50' : 'bg-rose-50'}`}>
-                  <div className="font-bold">{feedback.correct ? '정답!' : `오답 · 정답은 ${feedback.answer}`}
+                  <div className="font-bold">{feedback.crit ? '크리티컬! 정답 ' : ''}{feedback.correct ? (feedback.crit ? '' : '정답!') : `오답 · 정답은 ${feedback.answer}`}
                     {feedback.xp > 0 && <span className="ml-2 text-green-700">+{feedback.xp}XP +{feedback.coins}🪙</span>}</div>
                   {feedback.explanation && <p className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-gray-700">{feedback.explanation}</p>}
                   <div className="mt-1 text-[11px] text-gray-500">{feedback.nextText}</div>
@@ -259,15 +267,17 @@ export default function GameClient() {
 
       {tab === 'review' && (
         <section className="rounded-xl bg-white p-3 text-sm shadow-sm">
-          <div className="text-base font-bold">오늘의 복습</div>
-          <p className="mt-1 text-gray-600">복습 예정 문항 <b>{dueCount}</b>개 · 오답 이력이 있는 문항 <b>{wrongDocs}</b>개 (기록은 지워지지 않습니다)</p>
-          <button disabled={!dueCount} onClick={() => start({ review: true })} className="mt-3 w-full rounded-lg bg-blue-600 py-3 font-bold text-white disabled:bg-gray-300">복습 달리기 시작</button>
+          <div className="text-base font-bold">오답 복습 (크리티컬 공격)</div>
+          <p className="mt-1 text-gray-600">미처리 오답 <b className={openCount ? 'text-rose-600' : ''}>{openCount}</b>개 · 복습 예정 <b>{dueCount}</b>개 · 오답 이력 전체 <b>{wrongDocs}</b>개</p>
+          <p className="mt-1 text-[12px] text-gray-500">틀린 문제는 <b>같은 문제를 연속 {CLEAR_STREAK}번 맞힐 때까지</b> 접속할 때마다 불시 공격으로 나옵니다. 맞히면 크리티컬(피해 2배)! 오답 기록 자체는 지워지지 않습니다.</p>
+          <button disabled={!openCount && !dueCount} onClick={() => start({ review: true })} className="mt-3 w-full rounded-lg bg-rose-600 py-3 font-bold text-white disabled:bg-gray-300">{openCount ? `미처리 오답 ${openCount}개 처리하기` : '복습 달리기 시작'}</button>
           <ul className="mt-3 divide-y">
-            {questions.filter(x => game.schedules[x.id]?.wrongCount).sort((a, b) => game.schedules[b.id].wrongCount - game.schedules[a.id].wrongCount).slice(0, 15).map(x => {
+            {questions.filter(x => isOpenWrong(game.schedules[x.id])).sort((a, b) => game.schedules[b.id].wrongCount - game.schedules[a.id].wrongCount).slice(0, 20).map(x => {
               const s = game.schedules[x.id]
               return <li key={x.id} className="py-2"><div className="line-clamp-2">{x.statement}</div>
-                <div className="text-[11px] text-gray-500">오답 {s.wrongCount}회 · 단계 {s.box}/5 · {isDue(s, now) ? <b className="text-rose-600">복습 예정</b> : `다음 ${new Date(s.nextReviewAt).toLocaleDateString('ko-KR')}`}</div></li>
+                <div className="text-[11px] text-gray-500">틀린 횟수 {s.wrongCount}회 · <b className="text-rose-600">처리까지 연속 정답 {s.streak}/{CLEAR_STREAK}</b></div></li>
             })}
+            {!openCount && <li className="py-4 text-center text-gray-400">미처리 오답이 없습니다 👍</li>}
           </ul>
         </section>
       )}
