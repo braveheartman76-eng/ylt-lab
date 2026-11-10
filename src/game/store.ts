@@ -14,17 +14,19 @@ export interface SavedGame {
   hero: 'male' | 'female' // 선택한 헌터 캐릭터
   pet: string | null // 함께 다니는 펫(해금된 것 중 선택). null 이면 해금된 첫 번째
   sfx: { enabled: boolean; volume: number; bgm?: boolean } // 효과음 / 전투 배경음악(기본 꺼짐)
-  mode: 'single' | 'part' // 진행 방식: 한 문제씩 / 한 파트씩 자동진행
+  mode: 'single' | 'part' | 'case' // 진행 방식: 한 문제씩 / 한 파트씩 자동진행 / 사건 수사
   score: number // 간식·악당 처치 점수
   lifeAwards: number // 점수로 받은 생명 보너스 횟수
   hp: number // 현재 체력(생명)
+  caseClears: string[] // 해결한 사건 id(처음 해결할 때만 보상)
+  claims: Record<string, { grade: 'S' | 'A' | 'B' | 'C' | 'D'; reward: number; claimedAt: number }> // 주간 평가 보상 수령 기록(주 시작 날짜 → 등급/보상)
 }
 
 const KEY = 'ylt-game-v1'
 
 export const emptyGame = (): SavedGame => ({
   v: 1, schedules: {}, attempts: [], xp: 0, coins: 0, stage: 1, stageKills: 0, items: [],
-  tts: { enabled: false, rate: 1 }, track: 'police', hero: 'male', pet: null, sfx: { enabled: true, volume: 0.6, bgm: false }, mode: 'single', score: 0, lifeAwards: 0, hp: 3,
+  tts: { enabled: false, rate: 1 }, track: 'police', hero: 'male', pet: null, sfx: { enabled: true, volume: 0.6, bgm: false }, mode: 'single', score: 0, lifeAwards: 0, hp: 3, claims: {}, caseClears: [],
 })
 
 export function loadGame(): SavedGame {

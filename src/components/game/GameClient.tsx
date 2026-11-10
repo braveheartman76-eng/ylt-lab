@@ -12,16 +12,21 @@ import { speak, stopSpeaking, ttsSupported, unlockTts, readable } from '@/game/t
 import { configureSfx, playSfx, unlockSfx, startBgm, stopBgm } from '@/game/sfx'
 import { RESOLVE_MS } from '@/game/anim'
 import { buildParts, firstPart, nextPart, type Part } from '@/game/engine/parts'
+import { CASE_SIZE, SOLVE_MIN, buildCase, judgeCase, type CaseOutcome } from '@/game/engine/cases'
+import { ASSESSMENT_DISCLAIMER, WEEKLY_TARGET, claimReward, nextWeekGoals, weekKey, weekStartOf, weeklyAssessment, type Grade } from '@/game/engine/assessment'
 import { loadProgManifest, type ProgManifest } from '@/game/assets'
 import { ITEMS, MAX_HP, MAX_PLAYER_HP, SCORE_BOSS_KILL, SCORE_KILL, SCORE_PICKUP, TIERS, addScore, dropFor, isBossStage, nextTier, roomName, stageHp, themeOf, tierOf, toNextLife, unlockedPets } from '@/game/world'
 
 type Tab = 'play' | 'review' | 'report' | 'room'
 type Kind = PickKind | 'part'
 const KIND_LABEL: Record<Kind, string> = { critical: '⚠ 불시 공격 · 미처리 오답', review: '복습', new: '새 문제', challenge: '도전', any: '장기 확인', part: '파트 진행' }
+const GRADE_STYLE: Record<Grade, string> = { S: 'bg-yellow-400 text-yellow-950', A: 'bg-green-500 text-white', B: 'bg-blue-500 text-white', C: 'bg-orange-400 text-white', D: 'bg-gray-400 text-white' }
+const TRACKS: [string, string][] = [['police', '경찰'], ['corrections', '교정'], ['prosecution', '검찰'], ['court', '법원'], ['other', '기타']]
 const PART_AUTO_MS = 1500 // 파트 자동진행: 정답/오답 연출을 보여 준 뒤 다음 문제로
 
 interface PartItem { q: GameQuestion; selected: string; correct: boolean }
-interface PartResult { part: Part; items: PartItem[]; notes: string[]; next: Part | null }
+interface PartResult { part: Part; items: PartItem[]; notes: string[]; next: Part | null; caseOutcome?: CaseOutcome }
+const isCaseKey = (k: string) => k.startsWith('case:')
 
 interface Feedback {
   correct: boolean
@@ -131,7 +136,8 @@ export default function GameClient() {
   // 한 파트씩 자동진행: 파트(같은 소제목)의 문제를 책 순서대로 쭉 낸다
   const servePart = useCallback((r: { part: Part; idx: number }) => {
     stopSpeaking()
-    serve(r.part.questions[r.idx], 'part', { runMs: r.idx === 0 ? 3000 : 1700, forceGate: r.idx === 0 })
+    // 파트는 첫 문제에서만 문을 지난다. 사건은 단서마다 소제목이 달라 소제목이 바뀔 때마다 문을 지난다.
+    serve(r.part.questions[r.idx], 'part', { runMs: r.idx === 0 ? 3000 : 1700, forceGate: isCaseKey(r.part.key) ? (r.idx === 0 ? true : undefined) : r.idx === 0 })
   }, [serve])
 
   const startPart = useCallback((part: Part | null) => {
@@ -146,13 +152,24 @@ export default function GameClient() {
   // 파트 끝: 오답 여부와 해설을 한 번에 보여 준다
   const finishPart = useCallback(() => {
     if (!partRun) return
-    setPartResult({ part: partRun.part, items: partLog, notes: partNotes, next: nextPart(parts, partRun.part.key) })
+    let caseOutcome: CaseOutcome | undefined
+    if (isCaseKey(partRun.part.key)) {
+      // 사건 수사: 단서(정답)를 몇 개 모았는지로 해결 여부와 보상을 정한다(같은 사건은 처음 해결할 때만 보상)
+      const caseId = partRun.part.key.slice(5)
+      caseOutcome = judgeCase(partLog.filter(i => i.correct).length, partLog.length, (game.caseClears ?? []).includes(caseId))
+      if (caseOutcome.firstClear) {
+        const sc = addScore({ score: game.score, lifeAwards: game.lifeAwards, hp: game.hp, coins: game.coins + caseOutcome.coins }, caseOutcome.score)
+        setGame(g => ({ ...g, coins: sc.coins, score: sc.score, lifeAwards: sc.lifeAwards, hp: sc.hp, caseClears: [...(g.caseClears ?? []), caseId] }))
+        if (sc.lives) setToast(`❤ 생명 +${sc.lives} (사건 해결 점수 보너스!)`)
+      }
+      playSfx(caseOutcome.solved ? 'clear' : 'wrong')
+    } else playSfx(partLog.every(i => i.correct) ? 'clear' : 'coin')
+    setPartResult({ part: partRun.part, items: partLog, notes: partNotes, next: isCaseKey(partRun.part.key) ? null : nextPart(parts, partRun.part.key), caseOutcome })
     setPartRun(null)
     setCurrent(null)
     setFeedback(null)
     setPhase('feedback') // 장면은 그대로 두고 결과 화면을 띄운다
-    playSfx(partLog.every(i => i.correct) ? 'clear' : 'coin')
-  }, [partRun, partLog, partNotes, parts])
+  }, [partRun, partLog, partNotes, parts, game])
 
   const partAdvance = useCallback(() => {
     if (!partRun) return
@@ -286,6 +303,13 @@ export default function GameClient() {
   }, [phase, feedback, current, partRun, partAdvance])
   useEffect(() => () => { stopSpeaking() }, [])
 
+  // 사건 수사: 학습이 필요한 대제목에서 단서 문제 5개를 골라 파트처럼 진행한다
+  const startCase = (excludeId?: string) => {
+    const c = buildCase(questions, game.schedules, { excludeIds: excludeId ? [excludeId] : [] })
+    if (!c) { setToast('사건을 만들 문제가 부족해요(한 대제목에 문제가 3개 이상 필요해요).'); setPhase('idle'); return }
+    startPart({ key: `case:${c.id}`, section: c.section, title: c.title, questions: c.questions })
+  }
+
   const start = (opts: { review?: boolean; unit?: string }) => {
     unlockTts()
     unlockSfx() // 모바일: 첫 터치에서 오디오 잠금 해제
@@ -293,7 +317,10 @@ export default function GameClient() {
     setFocusUnit(opts.unit)
     setTab('play')
     setPartResult(null)
-    if (game.mode === 'part' && !opts.review && !opts.unit) {
+    if (game.mode === 'case' && !opts.review && !opts.unit) {
+      setPartRun(null)
+      startCase()
+    } else if (game.mode === 'part' && !opts.review && !opts.unit) {
       setPartRun(null)
       startPart(firstPart(parts, game.schedules, Date.now()))
     } else {
@@ -320,6 +347,18 @@ export default function GameClient() {
       ta.remove()
     }
     window.setTimeout(() => setCopied(null), 3000)
+  }
+
+  // 주간 평가(한국 시간 월~일). 이번 주는 '중간 결과', 지난주는 확정 결과 + 보상 수령.
+  const thisWeekStart = weekStartOf(now)
+  const wkNow = useMemo(() => weeklyAssessment(game.attempts, game.schedules, questions, thisWeekStart), [game.attempts, game.schedules, questions, thisWeekStart])
+  const wkPrev = useMemo(() => weeklyAssessment(game.attempts, game.schedules, questions, thisWeekStart - 7 * 24 * 3600 * 1000), [game.attempts, game.schedules, questions, thisWeekStart])
+  const goals = useMemo(() => nextWeekGoals(wkNow, openCount), [wkNow, openCount])
+  const claimPrev = () => {
+    const r = claimReward(game.claims ?? {}, wkPrev, Date.now())
+    if (!r.coins) { setToast(r.reason ?? '받을 수 없어요'); return }
+    setGame(g => ({ ...g, coins: g.coins + r.coins, claims: r.claims }))
+    playSfx('levelup'); setToast(`🎁 주간 보상 +${r.coins}🪙 (${wkPrev.grade}등급)`)
   }
 
   const stats = useMemo(() => unitStats(game.attempts, questions, game.schedules), [game.attempts, questions, game.schedules])
@@ -377,7 +416,7 @@ export default function GameClient() {
           {current && phase !== 'idle' && (
             <div className="mt-2 rounded-xl bg-white p-3 shadow-sm">
               <div className="mb-1 flex items-start justify-between gap-2 text-[11px] text-gray-500">
-                <span className="shrink-0 whitespace-nowrap rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">{current.kind === 'part' && partRun ? `파트 ${partRun.idx + 1}/${partRun.part.questions.length}` : KIND_LABEL[current.kind]}</span>
+                <span className="shrink-0 whitespace-nowrap rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">{current.kind === 'part' && partRun ? `${isCaseKey(partRun.part.key) ? '단서' : '파트'} ${partRun.idx + 1}/${partRun.part.questions.length}` : KIND_LABEL[current.kind]}</span>
                 <span className="line-clamp-2 text-right">{q!.unitTitle}{q!.isTestData ? ' · 테스트' : ''}{q!.derivedFrom ? ' · 선지 변형' : ''}</span>
               </div>
               {phase === 'running' && <div className="py-6 text-center text-sm text-gray-500">{current.kind === 'critical' ? '⚠ 불시 공격이 다가온다! ' : ''}다음 문제로 달리는 중…</div>}
@@ -402,7 +441,7 @@ export default function GameClient() {
               {phase === 'feedback' && feedback && current.kind === 'part' && (
                 // 한 파트씩 자동진행: 정답/오답만 알려 주고 자동으로 다음 문제로 (해설은 파트 끝에서 한꺼번에)
                 <div className={`mt-3 rounded-lg p-3 text-center text-sm font-bold ${feedback.correct ? 'bg-green-50 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
-                  {feedback.correct ? '⭕ 정답!' : '❌ 오답'} <span className="ml-1 text-[11px] font-normal text-gray-500">{partRun && partRun.idx + 1 < partRun.part.questions.length ? '다음 문제로 이동…' : '파트 끝! 결과를 모아 보여 드려요…'}</span>
+                  {partRun && isCaseKey(partRun.part.key) ? (feedback.correct ? '🔎 단서 확보!' : '🌫️ 단서가 흐려졌다…') : feedback.correct ? '⭕ 정답!' : '❌ 오답'} <span className="ml-1 text-[11px] font-normal text-gray-500">{partRun && partRun.idx + 1 < partRun.part.questions.length ? '다음으로 이동…' : '끝! 결과를 모아 보여 드려요…'}</span>
                   {feedback.points ? <span className="ml-2 text-[12px] text-blue-700">악당 처치 +{feedback.points}점</span> : null}
                 </div>
               )}
@@ -428,7 +467,14 @@ export default function GameClient() {
           {/* 한 파트씩 자동진행: 파트 결과(오답 여부 + 해설을 한 번에) */}
           {partResult && (
             <div className="mt-2 rounded-xl bg-white p-3 shadow-sm">
-              <div className="text-base font-bold">📋 파트 결과 · {partResult.part.title}</div>
+              <div className="text-base font-bold">{partResult.caseOutcome ? '🕵️ 사건 수사 결과' : '📋 파트 결과'} · {partResult.part.title}</div>
+              {partResult.caseOutcome && (
+                <div className={`mt-2 rounded-lg p-3 text-center ${partResult.caseOutcome.solved ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-700'}`}>
+                  <div className="text-sm font-black">{partResult.caseOutcome.verdict}</div>
+                  <div className="mt-1 text-[12px]">단서 {partResult.caseOutcome.correct}/{partResult.caseOutcome.total} 확보 (해결 기준 {Math.min(SOLVE_MIN, partResult.caseOutcome.total)}개){partResult.caseOutcome.firstClear ? ` · 보상 +${partResult.caseOutcome.coins}🪙 +${partResult.caseOutcome.score}점` : ''}</div>
+                  <div className="mt-1 text-lg tracking-widest">{partResult.items.map((i, k) => <span key={k}>{i.correct ? '🔎' : '🌫️'}</span>)}</div>
+                </div>
+              )}
               <div className="mt-1 text-[12px] text-gray-500">{partResult.part.section}</div>
               {(() => {
                 const ok = partResult.items.filter(i => i.correct).length, n = partResult.items.length
@@ -462,8 +508,10 @@ export default function GameClient() {
               </ul>
               <div className="mt-3 flex gap-2">
                 <button onClick={() => { stopSpeaking(); setPartResult(null); setPhase('idle') }} className="rounded-lg bg-gray-200 px-3 py-3 text-sm">그만하기</button>
-                <button onClick={() => { stopSpeaking(); startPart(partResult.part) }} className="rounded-lg bg-white px-3 py-3 text-sm ring-1 ring-gray-300">이 파트 다시</button>
-                {partResult.next
+                <button onClick={() => { stopSpeaking(); startPart(partResult.part) }} className="rounded-lg bg-white px-3 py-3 text-sm ring-1 ring-gray-300">{partResult.caseOutcome ? '이 사건 다시' : '이 파트 다시'}</button>
+                {partResult.caseOutcome
+                  ? <button onClick={() => { stopSpeaking(); startCase(partResult.part.key.slice(5)) }} className="flex-1 rounded-lg bg-indigo-600 py-3 text-sm font-bold text-white">새 사건 수사 ▶</button>
+                  : partResult.next
                   ? <button onClick={() => { stopSpeaking(); startPart(partResult.next) }} className="flex-1 rounded-lg bg-blue-600 py-3 text-sm font-bold text-white">다음 파트로 ▶ <span className="font-normal opacity-80">{partResult.next.title}</span></button>
                   : <div className="flex-1 rounded-lg bg-green-100 py-3 text-center text-sm font-bold text-green-700">모든 파트를 끝냈어요! 🎉</div>}
               </div>
@@ -474,8 +522,8 @@ export default function GameClient() {
           {phase === 'idle' && !partResult && questions.length > 0 && (
             <div className="mt-2 rounded-xl bg-white p-3 shadow-sm">
               <div className="text-sm font-bold">진행 방식 선택</div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {([['single', '한 문제씩', '풀 때마다 정답·해설을 보고, “다음 문제”를 눌러야 달려가요.'], ['part', '한 파트씩 자동진행', '정답·오답만 체크하며 파트(목차) 끝까지 쭉 달리고, 끝에서 오답과 해설을 한꺼번에 봐요.']] as const).map(([k, title, desc]) => (
+              <div className="mt-2 grid grid-cols-1 gap-2">
+                {([['single', '한 문제씩', '풀 때마다 정답·해설을 보고, “다음 문제”를 눌러야 달려가요.'], ['part', '한 파트씩 자동진행', '정답·오답만 체크하며 파트(목차) 끝까지 쭉 달리고, 끝에서 오답과 해설을 한꺼번에 봐요.'], ['case', '🕵️ 사건 수사', `학습이 필요한 대제목에서 단서(문제) ${CASE_SIZE}개를 모아요. ${SOLVE_MIN}개 이상 맞히면 사건 해결! (처음 해결할 때 보상)`]] as const).map(([k, title, desc]) => (
                   <button key={k} onClick={() => setGame(g => ({ ...g, mode: k }))} aria-pressed={game.mode === k}
                     className={`rounded-xl border-2 p-3 text-left ${game.mode === k ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white'}`}>
                     <div className="text-[14px] font-bold">{game.mode === k ? '✅ ' : ''}{title}</div>
@@ -487,7 +535,14 @@ export default function GameClient() {
                 {(['male', 'female'] as const).map(hk => (
                   <button key={hk} onClick={() => setGame(g => ({ ...g, hero: hk }))}
                     className={`rounded-full px-3 py-1 font-bold ${game.hero === hk ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>{hk === 'male' ? '남자 헌터' : '여자 헌터'}</button>))}
-                <span className="ml-auto text-[11px] text-gray-400">{game.mode === 'part' ? `파트 ${parts.length}개` : ''}</span>
+                <span className="ml-auto text-[11px] text-gray-400">{game.mode === 'part' ? `파트 ${parts.length}개` : game.mode === 'case' ? `해결한 사건 ${(game.caseClears ?? []).length}건` : ''}</span>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-gray-500">직렬</span>
+                {TRACKS.map(([k, label]) => (
+                  <button key={k} onClick={() => setGame(g => ({ ...g, track: k }))} aria-pressed={game.track === k}
+                    className={`rounded-full px-3 py-1 font-bold ${game.track === k ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>{label}</button>))}
+                <span className="basis-full text-[10px] text-gray-400">직렬별 문제·의상은 준비 중이에요. 지금은 선택만 저장돼요.</span>
               </div>
             </div>
           )}
@@ -528,6 +583,33 @@ export default function GameClient() {
 
       {tab === 'report' && (
         <section className="space-y-2 text-sm">
+          {toast && <div className="rounded-lg bg-pink-100 px-3 py-2 text-center text-sm font-bold text-pink-700">{toast}</div>}
+          <div className="rounded-xl bg-white p-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="text-base font-bold">📅 이번 주 학습 평가 <span className="text-[11px] font-normal text-gray-400">({weekKey(thisWeekStart)} 월요일 시작 · 중간 결과)</span></div>
+              <div className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl font-black ${wkNow.grade ? GRADE_STYLE[wkNow.grade] : 'bg-gray-100 text-gray-400'}`}>{wkNow.grade ?? '—'}</div>
+            </div>
+            {wkNow.holdReason && <p className="mt-1 text-[12px] text-gray-500">{wkNow.holdReason}</p>}
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
+              <div>푼 문항 <b>{wkNow.solved}</b> / 목표 {WEEKLY_TARGET}</div>
+              <div>정확도 <b>{wkNow.accuracy ?? '-'}{wkNow.accuracy !== null && '%'}</b></div>
+              <div>오답 복습 완료 <b>{wkNow.reviewCompletion ?? '-'}{wkNow.reviewCompletion !== null && '%'}</b> <span className="text-gray-400">({wkNow.reviewCleared}/{wkNow.reviewTotal})</span></div>
+              <div>복습 단계 평균 <b>{wkNow.masteryAvg ?? '-'}</b></div>
+              <div className="col-span-2">지난주 대비 정답률 <b>{wkNow.trend === null ? '비교할 지난주 기록 없음' : `${wkNow.trend > 0 ? '+' : ''}${wkNow.trend}%p`}</b></div>
+            </div>
+            <div className="mt-2 rounded-lg bg-slate-50 p-2 text-[12px]">
+              <div className="font-bold text-slate-700">다음 주 추천 목표</div>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-slate-600">{goals.map(g => <li key={g}>{g}</li>)}</ul>
+            </div>
+            <div className="mt-2 flex items-center gap-2 text-[12px]">
+              <span className="font-bold">지난주({weekKey(thisWeekStart - 7 * 24 * 3600 * 1000)}) 결과</span>
+              <span className={`rounded px-2 py-0.5 font-black ${wkPrev.grade ? GRADE_STYLE[wkPrev.grade] : 'bg-gray-100 text-gray-400'}`}>{wkPrev.grade ?? '보류'}</span>
+              {wkPrev.grade && (game.claims?.[wkPrev.key]
+                ? <span className="ml-auto text-green-700">🎁 보상 수령 완료 (+{game.claims[wkPrev.key].reward}🪙)</span>
+                : <button onClick={claimPrev} className="ml-auto rounded-lg bg-amber-500 px-3 py-1 font-bold text-white">보상 받기 +{wkPrev.reward}🪙</button>)}
+            </div>
+            <p className="mt-2 text-[10px] leading-snug text-gray-400">{ASSESSMENT_DISCLAIMER}</p>
+          </div>
           <div className="grid grid-cols-3 gap-2 text-center">
             {[['푼 문제', total], ['정답률', total ? `${Math.round(correctN / total * 100)}%` : '-'], ['첫 풀이 정답률', firstA.length ? `${Math.round(firstA.filter(a => a.isCorrect).length / firstA.length * 100)}%` : '-']].map(([k, v]) => (
               <div key={String(k)} className="rounded-xl bg-white p-3 shadow-sm"><div className="text-lg font-bold">{v}</div><div className="text-[11px] text-gray-500">{k}</div></div>))}
